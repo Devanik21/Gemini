@@ -101,42 +101,80 @@ if user_file is not None:
             st.error(f"Error processing image: {e}")
     elif input_type == "Files":
         file_name = user_file.name
+        file_extension = file_name.lower().split('.')[-1] if '.' in file_name else ''
+        
         st.session_state["messages"].append({"role": "user", "file": file_name})
         with st.chat_message("user"):
             st.write(f"📁 File: {file_name}")
         
-        # If the file is a PDF, extract its text automatically
-        if file_name.lower().endswith(".pdf"):
+        # Initialize chat history if it doesn't exist
+        if "chat_history" not in st.session_state:
+            st.session_state["chat_history"] = []
+            
+        # Handle different file types
+        text = ""
+        
+        # PDF files
+        if file_extension == "pdf":
             try:
                 pdf_reader = PyPDF2.PdfReader(user_file)
-                text = ""
                 for page in pdf_reader.pages:
                     text += page.extract_text() or ""
-                
-                if text:
-                    # Store the extracted text in session state for context
-                    st.session_state["file_content"] = text
-                    
-                    # Add file content to display history
-                    content_preview = text[:500] + "..." if len(text) > 500 else text
-                    st.session_state["messages"].append({"role": "user", "content": f"**Extracted PDF Content:**\n{content_preview}"})
-                    
-                    with st.chat_message("user"):
-                        st.markdown("**Extracted PDF Content:**")
-                        st.write(content_preview)
-                    
-                    # Add to model context history
-                    if "chat_history" not in st.session_state:
-                        st.session_state["chat_history"] = []
-                    
-                    st.session_state["chat_history"].append({
-                        "role": "user", 
-                        "content": f"I've uploaded a PDF file named '{file_name}'. Here's the content:\n\n{text}"
-                    })
             except Exception as e:
                 st.error(f"Error extracting PDF text: {e}")
         
-        # For other file types like txt, you might add similar handling
+        # Text files
+        elif file_extension in ["txt", "text"]:
+            try:
+                text = user_file.getvalue().decode('utf-8')
+            except Exception as e:
+                st.error(f"Error reading text file: {e}")
+        
+        # DOCX files (would need python-docx library)
+        elif file_extension == "docx":
+            st.warning("DOCX support requires additional setup. Please install python-docx library.")
+            text = "DOCX file content would be processed here. To enable DOCX support, add: `import docx` and extract text with the docx library."
+        
+        # Handle images
+        elif file_extension in ["png", "jpg", "jpeg"]:
+            try:
+                image = Image.open(user_file)
+                st.session_state["messages"].append({"role": "user", "image": image})
+                with st.chat_message("user"):
+                    st.image(image, caption="User Image")
+                
+                # Add image context
+                st.session_state["chat_history"].append({
+                    "role": "user", 
+                    "content": f"I've uploaded an image file named '{file_name}'."
+                })
+                return  # Exit early since we've handled the image
+            except Exception as e:
+                st.error(f"Error processing image: {e}")
+                text = f"[Failed to process image: {file_name}]"
+        
+        # Default handling for unsupported file types
+        else:
+            text = f"[Uploaded file: {file_name}. This file type isn't fully supported for text extraction.]"
+        
+        # Process extracted text (for all text-based files)
+        if text:
+            # Store the extracted text in session state for context
+            st.session_state["file_content"] = text
+            
+            # Add file content to display history
+            content_preview = text[:500] + "..." if len(text) > 500 else text
+            st.session_state["messages"].append({"role": "user", "content": f"**Extracted Content from {file_name}:**\n{content_preview}"})
+            
+            with st.chat_message("user"):
+                st.markdown(f"**Extracted Content from {file_name}:**")
+                st.write(content_preview)
+            
+            # Add to model context history
+            st.session_state["chat_history"].append({
+                "role": "user", 
+                "content": f"I've uploaded a file named '{file_name}'. Here's the content:\n\n{text}"
+            })
 
 # Keep chat input always visible for follow-up queries
 query = st.chat_input("Ask a question about your file, image, or continue chatting...")
