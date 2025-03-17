@@ -82,7 +82,7 @@ file_processed = False
 
 # Based on the input type, show the corresponding widget
 if input_type == "Text":
-    user_input = st.chat_input("Type your message...")
+    #user_input = st.chat_input("Type your message...")
 elif input_type == "Camera":
     user_file = st.camera_input("Capture a photo")
 elif input_type == "Gallery":
