@@ -51,8 +51,15 @@ for message in st.session_state["messages"]:
         else:
             st.markdown(message["content"])
 
-# User input
-if user_input := st.chat_input("Type your message..."):
+# Input type selection with a + button
+col1, col2 = st.columns([0.1, 0.9])
+with col1:
+    input_type = st.selectbox("+", ["Text", "Camera", "Gallery", "Files"], label_visibility="collapsed")
+
+with col2:
+    user_input = st.chat_input("Type your message...")
+
+if user_input:
     if not api_key:
         st.warning("⚠️ Please enter a valid Google Gemini API Key in the sidebar.")
     else:
