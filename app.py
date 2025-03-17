@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import io
+import PyPDF2
 
 # Configure the Streamlit page
 st.set_page_config(page_title="Gemini Chat Clone", page_icon="🤖", layout="wide")
@@ -70,19 +71,39 @@ elif input_type == "Camera":
 elif input_type == "Gallery":
     user_file = st.file_uploader("Select an image from your gallery", type=["png", "jpg", "jpeg"])
 elif input_type == "Files":
-    user_file = st.file_uploader("Upload a file")
+    user_file = st.file_uploader("Upload a file", type=["pdf", "txt", "docx", "png", "jpg", "jpeg"])
 
 # Process the uploaded file/image before taking input
 if user_file is not None:
     if input_type in ["Camera", "Gallery"]:
-        image = Image.open(user_file)
-        st.session_state["messages"].append({"role": "user", "image": image})
-        with st.chat_message("user"):
-            st.image(image, caption="User Image")
+        try:
+            image = Image.open(user_file)
+            st.session_state["messages"].append({"role": "user", "image": image})
+            with st.chat_message("user"):
+                st.image(image, caption="User Image")
+        except Exception as e:
+            st.error(f"Error processing image: {e}")
     elif input_type == "Files":
-        st.session_state["messages"].append({"role": "user", "file": user_file.name})
+        file_name = user_file.name
+        st.session_state["messages"].append({"role": "user", "file": file_name})
         with st.chat_message("user"):
-            st.write(f"📁 Uploaded file: {user_file.name}")
+            st.write(f"📁 Uploaded file: {file_name}")
+        
+        # If the file is a PDF, extract its text automatically
+        if file_name.lower().endswith(".pdf"):
+            try:
+                pdf_reader = PyPDF2.PdfReader(user_file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() or ""
+                if text:
+                    st.session_state["messages"].append({"role": "user", "content": text})
+                    with st.chat_message("user"):
+                        st.markdown("**Extracted PDF Content:**")
+                        st.write(text[:500] + "..." if len(text) > 500 else text)
+            except Exception as e:
+                st.error(f"Error extracting PDF text: {e}")
+        # For other file types, you might add other handling methods.
 
 # Keep chat input always visible for follow-up queries
 query = st.chat_input("Ask a question about your file, image, or continue chatting...")
