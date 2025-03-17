@@ -3,7 +3,7 @@ import google.generativeai as genai
 from PIL import Image
 import io
 import PyPDF2
-
+import docx
 # Configure the Streamlit page
 st.set_page_config(page_title="Gemini Chat Clone", page_icon="🤖", layout="wide")
 
