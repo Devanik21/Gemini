@@ -148,7 +148,9 @@ if user_file is not None:
                     "role": "user", 
                     "content": f"I've uploaded an image file named '{file_name}'."
                 })
-                return  # Exit early since we've handled the image
+                # Removed the invalid 'return' statement that was here
+                # Instead, we'll use a conditional to skip the rest of this block
+                text = ""  # Set empty text to indicate we've handled the image
             except Exception as e:
                 st.error(f"Error processing image: {e}")
                 text = f"[Failed to process image: {file_name}]"
