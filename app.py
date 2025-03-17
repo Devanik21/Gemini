@@ -175,33 +175,24 @@ if query:
                 chat = model.start_chat(history=formatted_history)
                 response = chat.send_message(query)
             
-            # Check if response contains an image (for models that support image generation)
-            if hasattr(response, "candidates") and hasattr(response.candidates[0], "content") and \
-               hasattr(response.candidates[0].content, "parts") and \
-               any(hasattr(part, "inline_data") for part in response.candidates[0].content.parts):
-                
-                # Extract image data (implementation would depend on exact API response structure)
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, "inline_data"):
-                        image_data = part.inline_data.data
-                        image = Image.open(io.BytesIO(image_data))
-                        
-                        # Add image response to history
-                        st.session_state["messages"].append({"role": "assistant", "image": image})
-                        
-                        # Display image
-                        with st.chat_message("assistant"):
-                            st.image(image, caption="Generated Image")
-                        
-                        # Add to model context
-                        st.session_state["chat_history"].append({"role": "assistant", "content": "[Generated image]"})
-            else:
-                # Add AI response to history
+            # Process the response
+            try:
+                # Extract the text response - this is the primary method that should work in most cases
                 ai_response = response.text.strip()
+                
+                # Add AI response to history
                 st.session_state["messages"].append({"role": "assistant", "content": ai_response})
                 
                 # Add to model context history
                 st.session_state["chat_history"].append({"role": "assistant", "content": ai_response})
+                
+                # Display AI response
+                with st.chat_message("assistant"):
+                    st.markdown(ai_response)
+                    
+            except Exception as e:
+                st.error(f"❌ Error processing response: {e}")
+                st.error("The model response couldn't be properly processed.")
                 
                 # Display AI response
                 with st.chat_message("assistant"):
