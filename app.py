@@ -29,8 +29,12 @@ with st.sidebar:
     # Chat History Button
     if st.button("📜 View Chat History"):
         st.markdown("### 📝 Chat History")
-        for message in st.session_state["messages"]:
-            st.write(f"**{message['role'].capitalize()}**: {message['content']}")
+        if st.session_state["messages"]:
+            for message in st.session_state["messages"]:
+                role = "User" if message["role"] == "user" else "AI"
+                st.write(f"**{role}:** {message.get('content', '[Image]')}")
+        else:
+            st.info("No chat history available.")
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
