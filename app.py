@@ -4,10 +4,31 @@ import google.generativeai as genai
 # Configure the Streamlit page
 st.set_page_config(page_title="Gemini Chat Clone", page_icon="🤖", layout="wide")
 
-# Sidebar for API Key
+# Sidebar for API Key and Controls
 with st.sidebar:
     st.markdown("### 🔑 API Configuration")
     api_key = st.text_input("Enter Google Gemini API Key:", type="password")
+    
+    # Model Selection
+    model_options = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp-image-generation",
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-pro-exp-02-05",
+        "gemini-2.0-flash-thinking-exp-01-21"
+    ]
+    selected_model = st.selectbox("🤖 Select Model:", model_options)
+    
+    # New Chat Button
+    if st.button("🆕 Start New Chat"):
+        st.session_state["messages"] = []
+        st.rerun()
+    
+    # Chat History Button
+    if st.button("📜 View Chat History"):
+        st.markdown("### 📝 Chat History")
+        for message in st.session_state["messages"]:
+            st.write(f"**{message['role'].capitalize()}**: {message['content']}")
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
@@ -29,7 +50,7 @@ if user_input := st.chat_input("Type your message..."):
         try:
             # Configure API
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")  # Using Pro version for better conversation handling
+            model = genai.GenerativeModel(selected_model)  # Use selected model
             
             # Add user message to history
             st.session_state["messages"].append({"role": "user", "content": user_input})
