@@ -3,7 +3,8 @@ import google.generativeai as genai
 from PIL import Image
 import io
 import PyPDF2
-import docx
+import docx  # Added for DOCX support
+
 # Configure the Streamlit page
 st.set_page_config(page_title="Gemini Chat Clone", page_icon="🤖", layout="wide")
 
@@ -130,10 +131,32 @@ if user_file is not None:
             except Exception as e:
                 st.error(f"Error reading text file: {e}")
         
-        # DOCX files (would need python-docx library)
+        # DOCX files
         elif file_extension == "docx":
-            st.warning("DOCX support requires additional setup. Please install python-docx library.")
-            text = "DOCX file content would be processed here. To enable DOCX support, add: `import docx` and extract text with the docx library."
+            try:
+                doc = docx.Document(user_file)
+                # Extract text from paragraphs
+                paragraphs_text = [para.text for para in doc.paragraphs if para.text.strip()]
+                
+                # Extract text from tables
+                tables_text = []
+                for table in doc.tables:
+                    for row in table.rows:
+                        row_text = [cell.text for cell in row.cells if cell.text.strip()]
+                        if row_text:
+                            tables_text.append(" | ".join(row_text))
+                
+                # Combine all extracted text
+                text = "\n\n".join(paragraphs_text)
+                if tables_text:
+                    text += "\n\n=== TABLES ===\n\n" + "\n".join(tables_text)
+                    
+                if not text.strip():
+                    st.warning("The DOCX file appears to be empty or contains only formatting.")
+                    text = "[Empty or unreadable DOCX file]"
+            except Exception as e:
+                st.error(f"Error extracting DOCX text: {e}")
+                text = f"[Failed to process DOCX: {str(e)}]"
         
         # Handle images
         elif file_extension in ["png", "jpg", "jpeg"]:
