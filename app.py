@@ -1,5 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
+import io
 
 # Configure the Streamlit page
 st.set_page_config(page_title="Gemini Chat Clone", page_icon="🤖", layout="wide")
@@ -40,7 +42,10 @@ st.write("Chat with AI continuously without losing context!")
 # Display chat history
 for message in st.session_state["messages"]:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        if "image" in message:
+            st.image(message["image"], caption="Generated Image")
+        else:
+            st.markdown(message["content"])
 
 # User input
 if user_input := st.chat_input("Type your message..."):
@@ -50,7 +55,7 @@ if user_input := st.chat_input("Type your message..."):
         try:
             # Configure API
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(selected_model)  # Use selected model
+            model = genai.GenerativeModel(selected_model)
             
             # Add user message to history
             st.session_state["messages"].append({"role": "user", "content": user_input})
@@ -63,13 +68,25 @@ if user_input := st.chat_input("Type your message..."):
             with st.spinner("Thinking..."):
                 response = model.generate_content(user_input)
             
-            # Add AI response to history
-            ai_response = response.text.strip()
-            st.session_state["messages"].append({"role": "assistant", "content": ai_response})
-            
-            # Display AI response
-            with st.chat_message("assistant"):
-                st.markdown(ai_response)
+            # Check if response contains an image
+            if hasattr(response, "image"):
+                image_data = response.image  # Extract image data
+                image = Image.open(io.BytesIO(image_data))  # Convert to PIL image
+                
+                # Add image response to history
+                st.session_state["messages"].append({"role": "assistant", "image": image})
+                
+                # Display image
+                with st.chat_message("assistant"):
+                    st.image(image, caption="Generated Image")
+            else:
+                # Add AI response to history
+                ai_response = response.text.strip()
+                st.session_state["messages"].append({"role": "assistant", "content": ai_response})
+                
+                # Display AI response
+                with st.chat_message("assistant"):
+                    st.markdown(ai_response)
         
         except Exception as e:
             st.error(f"❌ Error: {e}")
