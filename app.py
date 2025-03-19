@@ -1,15 +1,12 @@
 import streamlit as st
 import base64
 import os
-from google import genai
-from google.genai import types
-
+import google.generativeai as genai
+from google.generativeai import types
 
 def save_binary_file(file_name, data):
-    f = open(file_name, "wb")
-    f.write(data)
-    f.close()
-
+    with open(file_name, "wb") as f:
+        f.write(data)
 
 def generate():
     client = genai.Client(
@@ -60,7 +57,5 @@ def generate():
         else:
             st.write(chunk.text)
 
-
-# A simple Streamlit button to trigger generation
 if st.button("Generate Image"):
     generate()
