@@ -3,10 +3,9 @@ import google.generativeai as genai
 import base64
 import io
 from PIL import Image
-import requests
 
 # Configure Gemini API Key
-API_KEY = "AIzaSyDuMuSDMX4A33NYki7lgs6x13uxbHirMQk"
+API_KEY = "AIzaSyDuMuSDMX4A33NYki7lgs6x13uxbHirMQk"  # Replace with your actual API key
 genai.configure(api_key=API_KEY)
 
 # Streamlit UI
@@ -14,37 +13,58 @@ st.set_page_config(page_title="Dream Visualizer AI", layout="centered")
 st.title("🔮 Dream Visualizer AI")
 st.markdown("Enter your dream description, and AI will generate an image based on it!")
 
-# Function to analyze dream using Gemini-2.0-Flash-Exp
+# Function to analyze dream using Gemini Pro
 def analyze_dream(dream_text):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(
-            f"Analyze this dream and create a detailed visual description for image generation: {dream_text}"
+            f"""Analyze this dream and create a detailed visual description that can be used 
+            for image generation. Focus on visual elements, colors, mood, and composition. 
+            Keep the description under 200 words and make it suitable for image generation: 
+            {dream_text}"""
         )
         return response.text
     except Exception as e:
         return f"Error in analysis: {str(e)}"
 
-# Function to generate dream image using Gemini-2.0-Flash-Exp-Image-Generation
+# Function to generate dream image using Gemini's image generation model
 def generate_dream_image(prompt):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")  
+        # Use the correct model for image generation
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # Configure generation parameters
+        generation_config = {
+            "temperature": 0.9,
+            "top_p": 1,
+            "top_k": 32,
+            "max_output_tokens": 2048,
+        }
+        
+        # Set the prompt to specifically request an image
+        image_prompt = f"""Generate a photorealistic image based on this dream description: 
+        {prompt}
+        
+        The image should be vivid, detailed, and capture the essence of the dream.
+        """
+        
+        # Generate the content
         response = model.generate_content(
-            f"Generate a vivid image based on this dream description: {prompt}"
+            image_prompt,
+            generation_config=generation_config,
+            stream=False
         )
         
-        # Check if response contains image data
-        if hasattr(response, 'parts') and response.parts:
+        # Extract and decode the image data
+        if hasattr(response, 'parts'):
             for part in response.parts:
                 if hasattr(part, 'inline_data') and part.inline_data:
                     if part.inline_data.mime_type.startswith('image/'):
-                        # Get base64 encoded image data
-                        image_data = part.inline_data.data
-                        return image_data
+                        return part.inline_data.data
         
-        # If we couldn't find image data, the response might be in another format
-        # Return a message to help debugging
-        return f"No valid image data found in response: {str(response)}"
+        # If no image data is found, return an error message
+        return "No image data found in the response. The model might not support image generation."
+    
     except Exception as e:
         return f"Error in image generation: {str(e)}"
 
@@ -63,8 +83,21 @@ if st.button("Visualize My Dream ✨"):
             image_result = generate_dream_image(analyzed_text)
         
         # Handle the image result
-        if isinstance(image_result, str) and image_result.startswith("Error") or image_result.startswith("No valid"):
+        if isinstance(image_result, str) and (image_result.startswith("Error") or image_result.startswith("No")):
             st.error(image_result)
+            
+            # Fallback to using a placeholder image
+            st.subheader("Alternative Visualization:")
+            st.info("Using a placeholder image service instead")
+            
+            # Create a safe query from the analyzed text
+            safe_query = analyzed_text.replace(" ", "+")[:100]
+            placeholder_url = f"https://source.unsplash.com/800x600/?{safe_query}"
+            
+            try:
+                st.image(placeholder_url, caption="Alternative visualization based on your dream")
+            except Exception as e:
+                st.error(f"Failed to load placeholder image: {str(e)}")
         else:
             try:
                 # Try to display the image using base64 data
@@ -72,8 +105,9 @@ if st.button("Visualize My Dream ✨"):
                 st.image(image_result, caption="Your Dream, Visualized by AI")
             except Exception as e:
                 st.error(f"Failed to display image: {str(e)}")
-                
-                # Fallback - provide base64 string that can be used elsewhere
-                st.code(f"Base64 image data: {image_result[:50]}...")
     else:
         st.warning("Please enter a dream description.")
+
+# Add a footer
+st.markdown("---")
+st.markdown("Powered by Google Gemini AI")
