@@ -77,7 +77,7 @@ examples = [
 for example in examples:
     if st.sidebar.button(example):
         st.session_state.prompt = example
-        st.experimental_rerun()
+        st.rerun()
 
 # Add usage instructions
 st.sidebar.markdown("### How to use")
