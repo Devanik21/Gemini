@@ -3,7 +3,7 @@ import google.generativeai as genai
 import base64
 
 # Configure Gemini API Key
-API_KEY = "your_gemini_api_key_here"
+API_KEY = "AIzaSyDuMuSDMX4A33NYki7lgs6x13uxbHirMQk"
 genai.configure(api_key=API_KEY)
 
 # Streamlit UI
