@@ -1,113 +1,93 @@
 import streamlit as st
 import google.generativeai as genai
-import base64
-import io
 from PIL import Image
+import io
+import base64
 
-# Configure Gemini API Key
-API_KEY = "AIzaSyDuMuSDMX4A33NYki7lgs6x13uxbHirMQk"  # Replace with your actual API key
-genai.configure(api_key=API_KEY)
+# Set page config
+st.set_page_config(page_title="Gemini Image Generator", layout="wide")
 
-# Streamlit UI
-st.set_page_config(page_title="Dream Visualizer AI", layout="centered")
-st.title("🔮 Dream Visualizer AI")
-st.markdown("Enter your dream description, and AI will generate an image based on it!")
+# Initialize the app with title
+st.title("Text to Image Generator")
+st.subheader("Powered by Google Gemini")
 
-# Function to analyze dream using Gemini Pro
-def analyze_dream(dream_text):
+# API key input (with secure password input)
+api_key = st.sidebar.text_input("Enter your Google API Key:", type="password")
+
+# Function to generate image
+def generate_image(prompt, api_key):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            f"""Analyze this dream and create a detailed visual description that can be used 
-            for image generation. Focus on visual elements, colors, mood, and composition. 
-            Keep the description under 200 words and make it suitable for image generation: 
-            {dream_text}"""
-        )
-        return response.text
+        # Configure the API
+        genai.configure(api_key=api_key)
+        
+        # Set up model
+        model = genai.GenerativeModel('gemini-2.0-flash-exp-image-generation')
+        
+        # Generate image
+        response = model.generate_content(prompt)
+        
+        # Extract and return image data
+        for part in response.parts:
+            if part.mime_type.startswith('image/'):
+                return part.data
+                
+        return None
     except Exception as e:
-        return f"Error in analysis: {str(e)}"
+        st.error(f"Error: {str(e)}")
+        return None
 
-# Function to generate dream image using Gemini's image generation model
-def generate_dream_image(prompt):
-    try:
-        # Use the correct model for image generation
-        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
-        
-        # Configure generation parameters
-        generation_config = {
-            "temperature": 0.9,
-            "top_p": 1,
-            "top_k": 32,
-            "max_output_tokens": 2048,
-        }
-        
-        # Set the prompt to specifically request an image
-        image_prompt = f"""Generate a photorealistic image based on this dream description: 
-        {prompt}
-        
-        The image should be vivid, detailed, and capture the essence of the dream.
-        """
-        
-        # Generate the content
-        response = model.generate_content(
-            image_prompt,
-            generation_config=generation_config,
-            stream=False
-        )
-        
-        # Extract and decode the image data
-        if hasattr(response, 'parts'):
-            for part in response.parts:
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    if part.inline_data.mime_type.startswith('image/'):
-                        return part.inline_data.data
-        
-        # If no image data is found, return an error message
-        return "No image data found in the response. The model might not support image generation."
-    
-    except Exception as e:
-        return f"Error in image generation: {str(e)}"
+# Main app interface
+prompt = st.text_area("Enter your image description:", height=100)
 
-# User Input
-dream_text = st.text_area("Describe your dream:")
+# Image generation settings
+col1, col2 = st.columns(2)
+with col1:
+    generate_button = st.button("Generate Image", type="primary")
 
-if st.button("Visualize My Dream ✨"):
-    if dream_text:
-        with st.spinner("Analyzing your dream..."):
-            analyzed_text = analyze_dream(dream_text)
-        
-        st.subheader("Dream Interpretation:")
-        st.write(analyzed_text)
-        
-        with st.spinner("Generating dream image..."):
-            image_result = generate_dream_image(analyzed_text)
-        
-        # Handle the image result
-        if isinstance(image_result, str) and (image_result.startswith("Error") or image_result.startswith("No")):
-            st.error(image_result)
-            
-            # Fallback to using a placeholder image
-            st.subheader("Alternative Visualization:")
-            st.info("Using a placeholder image service instead")
-            
-            # Create a safe query from the analyzed text
-            safe_query = analyzed_text.replace(" ", "+")[:100]
-            placeholder_url = f"https://source.unsplash.com/800x600/?{safe_query}"
-            
-            try:
-                st.image(placeholder_url, caption="Alternative visualization based on your dream")
-            except Exception as e:
-                st.error(f"Failed to load placeholder image: {str(e)}")
-        else:
-            try:
-                # Try to display the image using base64 data
-                st.subheader("Dream Visualization:")
-                st.image(image_result, caption="Your Dream, Visualized by AI")
-            except Exception as e:
-                st.error(f"Failed to display image: {str(e)}")
+# Generate image when button is clicked
+if generate_button:
+    if not api_key:
+        st.warning("Please enter your Google API Key in the sidebar.")
+    elif not prompt:
+        st.warning("Please enter a description for the image.")
     else:
-        st.warning("Please enter a dream description.")
+        with st.spinner("Generating image..."):
+            image_data = generate_image(prompt, api_key)
+            
+            if image_data:
+                # Display the generated image
+                st.subheader("Generated Image")
+                st.image(Image.open(io.BytesIO(image_data)), use_column_width=True)
+                
+                # Add download button
+                img_bytes = io.BytesIO(image_data)
+                img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
+                download_button = f'<a href="data:image/jpeg;base64,{img_b64}" download="generated_image.jpg" target="_blank"><button style="background-color:#4CAF50;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">Download Image</button></a>'
+                st.markdown(download_button, unsafe_allow_html=True)
+            else:
+                st.error("Failed to generate image. Please try again with a different prompt.")
 
-# Add a footer
-st.markdown("---")
-st.markdown("Powered by Google Gemini AI")
+# Add some example prompts
+st.sidebar.markdown("### Example Prompts")
+examples = [
+    "A serene lake surrounded by mountains at sunset",
+    "Futuristic cityscape with flying cars and neon lights",
+    "A photorealistic cat wearing a space helmet"
+]
+for example in examples:
+    if st.sidebar.button(example):
+        st.session_state.prompt = example
+        st.experimental_rerun()
+
+# Add usage instructions
+st.sidebar.markdown("### How to use")
+st.sidebar.markdown("""
+1. Enter your Google API Key
+2. Write a detailed description
+3. Click 'Generate Image'
+4. Download your created image
+""")
+
+# Footer
+st.sidebar.markdown("---")
+st.sidebar.markdown("Using Google's Gemini 2.0 Flash Image Generation model")
