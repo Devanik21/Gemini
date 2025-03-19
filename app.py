@@ -11,7 +11,7 @@ st.set_page_config(page_title="Dream Visualizer AI", layout="centered")
 st.title("🔮 Dream Visualizer AI")
 st.markdown("Enter your dream description, and AI will generate an image based on it!")
 
-# Function to generate AI text analysis of dream
+# Function to generate AI text analysis of dream using Gemini-2.0-Flash-Exp
 def analyze_dream(dream_text):
     try:
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
@@ -23,10 +23,10 @@ def analyze_dream(dream_text):
 # Function to generate dream image using Gemini-2.0-Flash-Exp-Image-Generation
 def generate_dream_image(prompt):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")  # Alias for Gemini-2.0-Flash-Exp-Image-Generation
+        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
         response = model.generate_content(prompt)
         if response.parts:
-            return response.parts[0].text  # Image URL or base64 content
+            return response.parts[0].text  # Expected to be an image URL or base64 encoded image
         else:
             return "Error: No image generated"
     except Exception as e:
@@ -51,5 +51,3 @@ if st.button("Visualize My Dream ✨"):
             st.error(image_result)
     else:
         st.warning("Please enter a dream description.")
-
-# Run the app using: streamlit run your_script.py
