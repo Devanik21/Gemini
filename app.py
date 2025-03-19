@@ -20,7 +20,7 @@ if api_key:
 # Image generation function
 def generate_image(prompt):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro")  # Use a valid Gemini model
+        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")  # Use a valid Gemini model
         response = model.generate_content(prompt)
         
         if response and response.candidates:
