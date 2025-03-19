@@ -16,7 +16,7 @@ st.markdown("Enter your dream description, and AI will generate an image based o
 # Function to analyze dream using Gemini Pro
 def analyze_dream(dream_text):
     try:
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(
             f"""Analyze this dream and create a detailed visual description that can be used 
             for image generation. Focus on visual elements, colors, mood, and composition. 
@@ -31,7 +31,7 @@ def analyze_dream(dream_text):
 def generate_dream_image(prompt):
     try:
         # Use the correct model for image generation
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
         
         # Configure generation parameters
         generation_config = {
