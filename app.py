@@ -20,29 +20,58 @@ def generate_image(prompt, api_key):
         # Configure the API
         genai.configure(api_key=api_key)
         
+        # Set up the generation config
+        generation_config = {
+            "temperature": 0.4,
+            "top_p": 1,
+            "top_k": 32,
+        }
+        
         # Set up model
-        model = genai.GenerativeModel('gemini-2.0-flash-exp-image-generation')
+        model = genai.GenerativeModel(
+            model_name='gemini-2.0-flash-exp-image-generation',
+            generation_config=generation_config
+        )
         
         # Generate image
         response = model.generate_content(prompt)
         
-        # Extract and return image data
-        for part in response.parts:
-            if part.mime_type.startswith('image/'):
-                return part.data
-                
+        # Print response structure for debugging
+        st.write("Response type:", type(response))
+        st.write("Response dir:", dir(response))
+        
+        # Try to retrieve the image
+        if hasattr(response, 'text'):
+            st.write("Response text:", response.text)
+        
+        # For Gemini 2.0, images are typically returned as base64 in the .text field
+        # Let's try to find and decode it
+        if hasattr(response, 'text') and response.text:
+            # Look for base64 data in the text
+            import re
+            base64_pattern = r'data:image\/[^;]+;base64,([^"]+)'
+            match = re.search(base64_pattern, response.text)
+            if match:
+                base64_data = match.group(1)
+                image_data = base64.b64decode(base64_data)
+                return image_data
+        
+        # If we made it here, we didn't find an image
+        st.error("Could not extract image from response.")
         return None
+        
     except Exception as e:
         st.error(f"Error: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
         return None
 
 # Main app interface
-prompt = st.text_area("Enter your image description:", height=100)
+prompt = st.text_area("Enter your image description:", height=100, 
+                     value="a landscape of mountains" if "prompt" not in st.session_state else st.session_state.prompt)
 
-# Image generation settings
-col1, col2 = st.columns(2)
-with col1:
-    generate_button = st.button("Generate Image", type="primary")
+# Generate button
+generate_button = st.button("Generate Image", type="primary")
 
 # Generate image when button is clicked
 if generate_button:
@@ -55,19 +84,24 @@ if generate_button:
             image_data = generate_image(prompt, api_key)
             
             if image_data:
-                # Display the generated image
-                st.subheader("Generated Image")
-                st.image(Image.open(io.BytesIO(image_data)), use_column_width=True)
-                
-                # Add download button
-                img_bytes = io.BytesIO(image_data)
-                img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-                download_button = f'<a href="data:image/jpeg;base64,{img_b64}" download="generated_image.jpg" target="_blank"><button style="background-color:#4CAF50;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">Download Image</button></a>'
-                st.markdown(download_button, unsafe_allow_html=True)
+                try:
+                    # Display the generated image
+                    st.subheader("Generated Image")
+                    img = Image.open(io.BytesIO(image_data))
+                    st.image(img, use_column_width=True)
+                    
+                    # Add download button
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format=img.format or 'PNG')
+                    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
+                    download_button = f'<a href="data:image/png;base64,{img_b64}" download="generated_image.png" target="_blank"><button style="background-color:#4CAF50;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">Download Image</button></a>'
+                    st.markdown(download_button, unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"Error displaying image: {str(e)}")
             else:
-                st.error("Failed to generate image. Please try again with a different prompt.")
+                st.error("Failed to generate image. Check the error messages above.")
 
-# Add some example prompts
+# Example prompts
 st.sidebar.markdown("### Example Prompts")
 examples = [
     "A serene lake surrounded by mountains at sunset",
@@ -77,9 +111,9 @@ examples = [
 for example in examples:
     if st.sidebar.button(example):
         st.session_state.prompt = example
-        st.rerun()
+        st.experimental_rerun()
 
-# Add usage instructions
+# Usage instructions
 st.sidebar.markdown("### How to use")
 st.sidebar.markdown("""
 1. Enter your Google API Key
