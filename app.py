@@ -1,127 +1,156 @@
 import streamlit as st
-import google.generativeai as genai
-from PIL import Image
-import io
 import base64
+import os
+from google import genai
+from google.genai import types
+import io
+from PIL import Image
 
 # Set page config
 st.set_page_config(page_title="Gemini Image Generator", layout="wide")
 
-# Initialize the app with title
-st.title("Text to Image Generator")
-st.subheader("Powered by Google Gemini")
+# App title and description
+st.title("Gemini 2.0 Image Generator")
+st.markdown("Generate photorealistic images using Google's Gemini 2.0 model")
 
-# API key input (with secure password input)
-api_key = st.sidebar.text_input("Enter your Google API Key:", type="password")
+# API key input
+api_key = st.sidebar.text_input("Enter your Gemini API Key", type="password")
+if api_key:
+    os.environ["GEMINI_API_KEY"] = api_key
 
-# Function to generate image
-def generate_image(prompt, api_key):
+# Image generation function
+def generate_image(prompt):
     try:
-        # Configure the API
-        genai.configure(api_key=api_key)
-        
-        # Set up the generation config
-        generation_config = {
-            "temperature": 0.4,
-            "top_p": 1,
-            "top_k": 32,
-        }
-        
-        # Set up model
-        model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash-exp-image-generation',
-            generation_config=generation_config
+        client = genai.Client(
+            api_key=os.environ.get("GEMINI_API_KEY"),
         )
+
+        model = "gemini-2.0-flash-exp-image-generation"
         
-        # Generate image
-        response = model.generate_content(prompt)
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=prompt),
+                ],
+            ),
+        ]
         
-        # Print response structure for debugging
-        st.write("Response type:", type(response))
-        st.write("Response dir:", dir(response))
+        generate_content_config = types.GenerateContentConfig(
+            temperature=1,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            response_modalities=[
+                "image",
+                "text",
+            ],
+            response_mime_type="text/plain",
+        )
+
+        image_data = None
+        text_response = ""
         
-        # Try to retrieve the image
-        if hasattr(response, 'text'):
-            st.write("Response text:", response.text)
+        for chunk in client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=generate_content_config,
+        ):
+            if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                continue
+            if chunk.candidates[0].content.parts[0].inline_data:
+                image_data = chunk.candidates[0].content.parts[0].inline_data.data
+            else:
+                text_response += chunk.text if chunk.text else ""
         
-        # For Gemini 2.0, images are typically returned as base64 in the .text field
-        # Let's try to find and decode it
-        if hasattr(response, 'text') and response.text:
-            # Look for base64 data in the text
-            import re
-            base64_pattern = r'data:image\/[^;]+;base64,([^"]+)'
-            match = re.search(base64_pattern, response.text)
-            if match:
-                base64_data = match.group(1)
-                image_data = base64.b64decode(base64_data)
-                return image_data
-        
-        # If we made it here, we didn't find an image
-        st.error("Could not extract image from response.")
-        return None
-        
+        return image_data, text_response
+    
     except Exception as e:
-        st.error(f"Error: {str(e)}")
-        import traceback
-        st.error(traceback.format_exc())
-        return None
+        st.error(f"Error generating image: {str(e)}")
+        return None, str(e)
 
 # Main app interface
-prompt = st.text_area("Enter your image description:", height=100, 
-                     value="a landscape of mountains" if "prompt" not in st.session_state else st.session_state.prompt)
+col1, col2 = st.columns([3, 2])
 
-# Generate button
-generate_button = st.button("Generate Image", type="primary")
+with col1:
+    # Image prompt input
+    prompt = st.text_area(
+        "Describe the image you want to generate",
+        "Generate a serene mountain lake at sunset with reflections in the water, pine trees along the shore, and snow-capped peaks in the background. Style: photorealistic with warm lighting.",
+        height=150
+    )
+    
+    # Generation settings
+    with st.expander("Advanced Settings"):
+        st.info("The default settings work well for most cases")
+        # Add more settings here if needed
 
-# Generate image when button is clicked
-if generate_button:
-    if not api_key:
-        st.warning("Please enter your Google API Key in the sidebar.")
-    elif not prompt:
-        st.warning("Please enter a description for the image.")
-    else:
-        with st.spinner("Generating image..."):
-            image_data = generate_image(prompt, api_key)
-            
-            if image_data:
-                try:
-                    # Display the generated image
-                    st.subheader("Generated Image")
-                    img = Image.open(io.BytesIO(image_data))
-                    st.image(img, use_column_width=True)
+    # Generate button
+    if st.button("Generate Image", type="primary"):
+        if not api_key:
+            st.warning("Please enter your Gemini API key in the sidebar")
+        else:
+            with st.spinner("Generating image..."):
+                image_data, text_response = generate_image(prompt)
+                
+                if image_data:
+                    # Convert binary data to image
+                    image = Image.open(io.BytesIO(image_data))
                     
-                    # Add download button
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format=img.format or 'PNG')
-                    img_b64 = base64.b64encode(img_bytes.getvalue()).decode()
-                    download_button = f'<a href="data:image/png;base64,{img_b64}" download="generated_image.png" target="_blank"><button style="background-color:#4CAF50;color:white;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;">Download Image</button></a>'
-                    st.markdown(download_button, unsafe_allow_html=True)
-                except Exception as e:
-                    st.error(f"Error displaying image: {str(e)}")
-            else:
-                st.error("Failed to generate image. Check the error messages above.")
+                    # Save to session state for download
+                    st.session_state.image = image
+                    st.session_state.image_data = image_data
+                    
+                    # Display image
+                    with col2:
+                        st.image(image, caption="Generated Image", use_column_width=True)
+                        
+                        # Download button
+                        buf = io.BytesIO()
+                        image.save(buf, format="JPEG")
+                        byte_im = buf.getvalue()
+                        st.download_button(
+                            label="Download Image",
+                            data=byte_im,
+                            file_name="gemini_generated.jpg",
+                            mime="image/jpeg",
+                        )
+                    
+                    # Display any text response
+                    if text_response:
+                        st.markdown("### Model Commentary")
+                        st.write(text_response)
 
-# Example prompts
-st.sidebar.markdown("### Example Prompts")
-examples = [
-    "A serene lake surrounded by mountains at sunset",
-    "Futuristic cityscape with flying cars and neon lights",
-    "A photorealistic cat wearing a space helmet"
-]
-for example in examples:
-    if st.sidebar.button(example):
-        st.session_state.prompt = example
-        st.experimental_rerun()
+# Initialize session state for storing generated images
+if 'image' not in st.session_state:
+    st.session_state.image = None
+if 'image_data' not in st.session_state:
+    st.session_state.image_data = None
 
-# Usage instructions
-st.sidebar.markdown("### How to use")
+# Display previously generated image if it exists
+if st.session_state.image and not st.button:
+    with col2:
+        st.image(st.session_state.image, caption="Generated Image", use_column_width=True)
+        
+        # Download button for previously generated image
+        buf = io.BytesIO()
+        st.session_state.image.save(buf, format="JPEG")
+        byte_im = buf.getvalue()
+        st.download_button(
+            label="Download Image",
+            data=byte_im,
+            file_name="gemini_generated.jpg",
+            mime="image/jpeg",
+        )
+
+# Instructions in the sidebar
+st.sidebar.markdown("## Instructions")
 st.sidebar.markdown("""
-1. Enter your Google API Key
-2. Write a detailed description
+1. Enter your Gemini API key above
+2. Write a detailed prompt for your image
 3. Click 'Generate Image'
-4. Download your created image
+4. Download the resulting image
 """)
 
-# Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("Using Google's Gemini 2.0 Flash Image Generation model")
+st.sidebar.markdown("Built with Streamlit and Google's Gemini 2.0")
