@@ -1,9 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 import base64
+import re
 
 # Configure Gemini API Key
-API_KEY = "AIzaSyDuMuSDMX4A33NYki7lgs6x13uxbHirMQk"
+API_KEY = "your_gemini_api_key_here"
 genai.configure(api_key=API_KEY)
 
 # Streamlit UI
@@ -32,6 +33,16 @@ def generate_dream_image(prompt):
     except Exception as e:
         return f"Error in image generation: {str(e)}"
 
+# Helper function to check if the result is a valid image URL or base64 image data
+def is_valid_image(content):
+    # Check if content is a URL that ends with an image extension
+    if content.startswith("http") and re.search(r'\.(jpg|jpeg|png|gif)$', content, re.IGNORECASE):
+        return True
+    # Check if content is a base64 image data URL
+    if content.startswith("data:image/"):
+        return True
+    return False
+
 # User Input
 dream_text = st.text_area("Describe your dream:")
 if st.button("Visualize My Dream ✨"):
@@ -44,10 +55,11 @@ if st.button("Visualize My Dream ✨"):
         with st.spinner("Generating dream image..."):
             image_result = generate_dream_image(analyzed_text)
         
-        if "Error" not in image_result:
+        # Validate if the output is a proper image
+        if is_valid_image(image_result):
             st.subheader("Dream Visualization:")
             st.image(image_result, caption="Your Dream, Visualized by AI", use_column_width=True)
         else:
-            st.error(image_result)
+            st.error("Image generation did not return a valid image. Output:\n" + image_result)
     else:
         st.warning("Please enter a dream description.")
