@@ -185,7 +185,7 @@ with col1:
 with col2:
     if st.button("Clear Chat 🗑️", use_container_width=True):
         st.session_state.chat_history = []
-        st.experimental_rerun()
+        st.rerun()
 
 # Process user question
 if submit_button and user_question:
@@ -211,7 +211,7 @@ if submit_button and user_question:
             st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
         
         # Rerun the app to update the chat display
-        st.experimental_rerun()
+        st.rerun()
 
 # Display a message if no file is uploaded
 if not st.session_state.file_content:
