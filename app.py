@@ -3,6 +3,7 @@ import os
 import google.generativeai as genai
 import tempfile
 import base64
+import mimetypes
 from io import BytesIO
 
 # Page configuration
