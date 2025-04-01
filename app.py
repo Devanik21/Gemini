@@ -1,68 +1,76 @@
 import streamlit as st
-import os
 import google.generativeai as genai
-import tempfile
-import base64
-import mimetypes
-from io import BytesIO
+import os
+import pandas as pd
+import docx
+import PyPDF2
+import io
+import time
+from pathlib import Path
 
-# Page configuration
-st.set_page_config(page_title="File Chat Assistant", layout="wide")
+# Set page configuration
+st.set_page_config(
+    page_title="Chat With Your Files",
+    page_icon="📁",
+    layout="wide"
+)
 
 # Initialize session state variables
-if "chat_context" not in st.session_state:
-    st.session_state.chat_context = []
-if "display_messages" not in st.session_state:
-    st.session_state.display_messages = []
-if "current_file" not in st.session_state:
-    st.session_state.current_file = None
+if "api_key" not in st.session_state:
+    st.session_state.api_key = None
+if "model" not in st.session_state:
+    st.session_state.model = "gemini-1.5-flash"
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 if "file_content" not in st.session_state:
     st.session_state.file_content = None
-if "file_type" not in st.session_state:
-    st.session_state.file_type = None
+if "file_name" not in st.session_state:
+    st.session_state.file_name = None
 
-# Function to get file content as base64
-def get_file_content(uploaded_file):
-    if uploaded_file is not None:
-        return BytesIO(uploaded_file.getvalue())
-    return None
+# Function to extract text from PDF
+def extract_text_from_pdf(file):
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text() + "\n"
+    return text
 
-# Function to encode file for API
-def encode_file(file_content, mime_type):
-    if file_content is not None:
-        file_bytes = file_content.read()
-        encoded = base64.b64encode(file_bytes).decode('utf-8')
-        return {"mime_type": mime_type, "data": encoded}
-    return None
+# Function to extract text from DOCX
+def extract_text_from_docx(file):
+    doc = docx.Document(file)
+    text = ""
+    for para in doc.paragraphs:
+        text += para.text + "\n"
+    return text
 
-# Function to process text with Gemini API
-def process_with_gemini(prompt, file_data=None, model_name="gemini-1.5-pro"):
+# Function to extract text from TXT
+def extract_text_from_txt(file):
+    return file.getvalue().decode("utf-8")
+
+# Function to extract text from CSV
+def extract_text_from_csv(file):
+    df = pd.read_csv(file)
+    return df.to_string()
+
+# Function to generate AI response
+def generate_ai_response(prompt, file_content, model_name, api_key):
     try:
-        genai.configure(api_key=st.session_state.api_key)
+        genai.configure(api_key=api_key)
+        
+        # Select the model
         model = genai.GenerativeModel(model_name)
         
-        # Create message content
-        content = []
-        
-        # Add text prompt
-        content.append({"role": "user", "parts": [{"text": prompt}]})
-        
-        # Add file if provided
-        if file_data:
-            content[0]["parts"].append(file_data)
-        
-        # Get chat based on history
-        chat = model.start_chat(history=st.session_state.chat_context)
+        # Create context with file content
+        context = f"File content: {file_content[:50000]}"  # Limiting to first 50K chars to avoid token limits
         
         # Generate response
-        response = chat.send_message(content[0]["parts"])
-        
-        # Update chat context
-        st.session_state.chat_context = chat.history
+        response = model.generate_content(
+            f"{context}\n\nUser question: {prompt}\n\nPlease answer the question based on the file content above."
+        )
         
         return response.text
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error generating response: {str(e)}"
 
 # Sidebar configuration
 with st.sidebar:
@@ -80,105 +88,144 @@ with st.sidebar:
     
     st.markdown("## ⚙️ Model Settings")
     model_options = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-1.0-pro",
+        "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", 
+        "gemini-2.0-pro", "gemini-1.5-flash-8b"
     ]
     
-    selected_model = st.selectbox("Select Model:", model_options)
+    selected_model = st.selectbox("Select Gemini Model:", model_options, index=0)
     st.session_state.model = selected_model
     
     st.markdown("---")
     
-    st.markdown("## 📄 Chat Controls")
-    if st.button("🆕 Start New Chat", use_container_width=True):
-        st.session_state.chat_context = []
-        st.session_state.display_messages = []
-        st.session_state.current_file = None
-        st.session_state.file_content = None
-        st.session_state.file_type = None
-        st.success("New chat started!")
-        st.rerun()
+    # About section
+    st.markdown("## ℹ️ About")
+    st.markdown("""
+    This app allows you to chat with your files using Google's Gemini API.
     
-    st.markdown("---")
+    **Supported file types:**
+    - PDF (.pdf)
+    - Word (.docx)
+    - Text (.txt)
+    - CSV (.csv)
     
-    # Display info about the current chat
-    if st.session_state.chat_context:
-        st.markdown(f"**Context Length:** {len(st.session_state.chat_context)} turns")
-    
-    if st.session_state.current_file:
-        st.markdown(f"**Current File:** {st.session_state.current_file.name}")
+    **Note:** File contents are processed locally and are not stored permanently.
+    """)
 
 # Main content area
 st.title("📁 Chat With Your Files")
+st.write("Upload a document and ask questions about its content")
 
-# File uploader
-with st.expander("Upload a file to discuss", expanded=not st.session_state.current_file):
-    uploaded_file = st.file_uploader("Choose a file", type=None)
+# File upload section
+uploaded_file = st.file_uploader("Upload your file", type=["pdf", "docx", "txt", "csv"])
+
+if uploaded_file:
+    # Process the file
+    file_details = {"Filename": uploaded_file.name, "FileType": uploaded_file.type, "FileSize": f"{uploaded_file.size / 1024:.2f} KB"}
     
-    if uploaded_file and (not st.session_state.current_file or uploaded_file.name != st.session_state.current_file.name):
-        st.session_state.current_file = uploaded_file
-        file_content = get_file_content(uploaded_file)
-        st.session_state.file_content = file_content
-        
-        # Determine file type
-        mime_type, _ = mimetypes.guess_type(uploaded_file.name)
-        if mime_type is None:
-            # Fallback for unknown types
-            if uploaded_file.name.endswith('.csv'):
-                mime_type = 'text/csv'
+    with st.expander("File Details", expanded=False):
+        st.json(file_details)
+    
+    # Extract content based on file type
+    try:
+        with st.spinner("Processing file..."):
+            if uploaded_file.type == "application/pdf":
+                extracted_text = extract_text_from_pdf(uploaded_file)
+                file_type = "PDF"
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                extracted_text = extract_text_from_docx(uploaded_file)
+                file_type = "DOCX"
+            elif uploaded_file.type == "text/plain":
+                extracted_text = extract_text_from_txt(uploaded_file)
+                file_type = "TXT"
+            elif uploaded_file.type == "text/csv":
+                extracted_text = extract_text_from_csv(uploaded_file)
+                file_type = "CSV"
             else:
-                mime_type = 'application/octet-stream'
+                st.error("Unsupported file type")
+                extracted_text = None
+                file_type = None
         
-        st.session_state.file_type = mime_type
-        
-        # Add initial system message about the file
-        if not st.session_state.display_messages:
-            file_info = f"File uploaded: {uploaded_file.name} ({mime_type})"
-            st.session_state.display_messages.append({"role": "system", "content": file_info})
+        if extracted_text:
+            st.session_state.file_content = extracted_text
+            st.session_state.file_name = uploaded_file.name
             
-            # Auto-generate initial summary if file is uploaded
-            if st.session_state.api_key:
-                with st.spinner("Analyzing your file..."):
-                    file_data = encode_file(st.session_state.file_content, st.session_state.file_type)
-                    summary_prompt = f"I've uploaded a file named {uploaded_file.name}. Please analyze it and provide a brief summary of its contents."
-                    summary = process_with_gemini(summary_prompt, file_data, st.session_state.model)
-                    st.session_state.display_messages.append({"role": "assistant", "content": summary})
+            with st.expander("Preview Content", expanded=False):
+                st.text_area("Extracted text:", extracted_text[:5000], height=300, disabled=True)
+                if len(extracted_text) > 5000:
+                    st.info(f"Showing first 5000 characters out of {len(extracted_text)} total characters")
+            
+            st.success(f"✅ {file_type} file processed successfully!")
+    
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
 
-# Display chat messages
+# Chat interface
+st.header("💬 Chat")
+
+# Display chat history
 chat_container = st.container()
 with chat_container:
-    for message in st.session_state.display_messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-# Chat input
-if prompt := st.chat_input("Ask something about your file..."):
-    if not st.session_state.api_key:
-        st.error("Please enter your Gemini API key in the sidebar")
-    elif not st.session_state.current_file:
-        st.warning("Please upload a file first")
-    else:
-        # Add user message to display
-        st.session_state.display_messages.append({"role": "user", "content": prompt})
+    for i, message in enumerate(st.session_state.chat_history):
+        if message["role"] == "user":
+            st.markdown(f"**You:** {message['content']}")
+        else:
+            st.markdown(f"**AI:** {message['content']}")
         
-        with st.spinner("Thinking..."):
-            # Reset file content position
-            if st.session_state.file_content:
-                st.session_state.file_content.seek(0)
+        # Add a separator between messages except for the last one
+        if i < len(st.session_state.chat_history) - 1:
+            st.markdown("---")
+
+# User input
+user_question = st.text_input("Ask a question about your file:", key="user_input")
+
+# Submit button
+col1, col2 = st.columns([1, 5])
+with col1:
+    submit_button = st.button("Ask 🔍", use_container_width=True)
+with col2:
+    if st.button("Clear Chat 🗑️", use_container_width=True):
+        st.session_state.chat_history = []
+        st.experimental_rerun()
+
+# Process user question
+if submit_button and user_question:
+    if not st.session_state.api_key:
+        st.error("Please enter your Gemini API key in the sidebar.")
+    elif not st.session_state.file_content:
+        st.warning("Please upload a file first.")
+    else:
+        # Add user message to chat history
+        st.session_state.chat_history.append({"role": "user", "content": user_question})
+        
+        # Display "AI is thinking" message
+        with st.spinner("AI is thinking..."):
+            # Generate AI response
+            ai_response = generate_ai_response(
+                user_question, 
+                st.session_state.file_content, 
+                st.session_state.model, 
+                st.session_state.api_key
+            )
             
-            # Encode file
-            file_data = encode_file(st.session_state.file_content, st.session_state.file_type)
-            
-            # Process with Gemini
-            response = process_with_gemini(prompt, file_data, st.session_state.model)
-            
-            # Add assistant response to display
-            st.session_state.display_messages.append({"role": "assistant", "content": response})
-            
-            # Force refresh to show the new messages
-            st.rerun()
+            # Add AI response to chat history
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+        
+        # Rerun the app to update the chat display
+        st.experimental_rerun()
+
+# Display a message if no file is uploaded
+if not st.session_state.file_content:
+    st.info("👆 Please upload a file to start chatting")
+
+# Bottom area with tips
+with st.expander("💡 Tips for better results"):
+    st.markdown("""
+    - Ask specific questions about the content in your file
+    - For large documents, try to reference specific sections or topics
+    - If the response seems incomplete, try breaking your question into smaller parts
+    - For CSV files, you can ask for specific data analysis or summaries
+    """)
 
 # Footer
 st.markdown("---")
-st.caption("Built with Streamlit and Gemini API")
+st.markdown("📁 Chat With Your Files | Made with ❤️ using Streamlit and Google Gemini")
