@@ -163,7 +163,27 @@ if uploaded_files:
                 else:
                     st.error(f"❌ Could not process '{uploaded_file.name}': {extracted_text}")
     
-
+    # Display files and allow removal
+    if st.session_state.files_content:
+        st.subheader("Processed Files")
+        
+        # Create a grid of files
+        num_cols = 3
+        cols = st.columns(num_cols)
+        files_to_remove = []
+        
+        for idx, filename in enumerate(st.session_state.files_content.keys()):
+            col_idx = idx % num_cols
+            with cols[col_idx]:
+                if st.button(f"🗑️ Remove '{filename}'", key=f"remove_{filename}"):
+                    files_to_remove.append(filename)
+        
+        # Remove files marked for deletion
+        for filename in files_to_remove:
+            if filename in st.session_state.files_content:
+                del st.session_state.files_content[filename]
+                st.success(f"Removed '{filename}'")
+                st.rerun()
 
 # Chat interface
 st.header("💬 Chat")
