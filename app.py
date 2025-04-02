@@ -1,12 +1,12 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 import pandas as pd
 import docx
 import PyPDF2
 import io
-import time
-from pathlib import Path
+import json
+import openpyxl
+from io import BytesIO
 
 # Set page configuration
 st.set_page_config(
@@ -19,15 +19,13 @@ st.set_page_config(
 if "api_key" not in st.session_state:
     st.session_state.api_key = None
 if "model" not in st.session_state:
-    st.session_state.model = "gemini-1.5-flash"
+    st.session_state.model = "gemini-2.0-flash"
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "file_content" not in st.session_state:
-    st.session_state.file_content = None
-if "file_name" not in st.session_state:
-    st.session_state.file_name = None
+if "files_content" not in st.session_state:
+    st.session_state.files_content = {}
 
-# Function to extract text from PDF
+# File extraction functions
 def extract_text_from_pdf(file):
     pdf_reader = PyPDF2.PdfReader(file)
     text = ""
@@ -35,7 +33,6 @@ def extract_text_from_pdf(file):
         text += page.extract_text() + "\n"
     return text
 
-# Function to extract text from DOCX
 def extract_text_from_docx(file):
     doc = docx.Document(file)
     text = ""
@@ -43,29 +40,67 @@ def extract_text_from_docx(file):
         text += para.text + "\n"
     return text
 
-# Function to extract text from TXT
 def extract_text_from_txt(file):
     return file.getvalue().decode("utf-8")
 
-# Function to extract text from CSV
 def extract_text_from_csv(file):
     df = pd.read_csv(file)
     return df.to_string()
 
-# Function to generate AI response
-def generate_ai_response(prompt, file_content, model_name, api_key):
+def extract_text_from_xlsx(file):
+    excel_data = BytesIO(file.getvalue())
+    workbook = openpyxl.load_workbook(excel_data, data_only=True)
+    text = ""
+    for sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+        text += f"Sheet: {sheet_name}\n"
+        for row in sheet.iter_rows(values_only=True):
+            text += str(row) + "\n"
+        text += "\n"
+    return text
+
+def extract_text_from_json(file):
+    try:
+        json_data = json.loads(file.getvalue().decode("utf-8"))
+        return json.dumps(json_data, indent=2)
+    except:
+        return "Error parsing JSON file"
+
+# Process file based on type
+def process_file(uploaded_file):
+    try:
+        file_type = uploaded_file.type
+        if file_type == "application/pdf":
+            return extract_text_from_pdf(uploaded_file), "PDF"
+        elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            return extract_text_from_docx(uploaded_file), "DOCX"
+        elif file_type == "text/plain":
+            return extract_text_from_txt(uploaded_file), "TXT"
+        elif file_type == "text/csv":
+            return extract_text_from_csv(uploaded_file), "CSV"
+        elif file_type == "application/json":
+            return extract_text_from_json(uploaded_file), "JSON"
+        elif "spreadsheetml" in file_type or file_type == "application/vnd.ms-excel":
+            return extract_text_from_xlsx(uploaded_file), "XLSX"
+        else:
+            return None, "Unsupported"
+    except Exception as e:
+        return f"Error processing file: {str(e)}", "Error"
+
+# Generate AI response
+def generate_ai_response(prompt, files_content, model_name, api_key):
     try:
         genai.configure(api_key=api_key)
-        
-        # Select the model
         model = genai.GenerativeModel(model_name)
         
-        # Create context with file content
-        context = f"File content: {file_content[:50000]}"  # Limiting to first 50K chars to avoid token limits
+        # Combine file contents and limit to avoid token limits
+        combined_content = ""
+        for filename, content in files_content.items():
+            combined_content += f"[File: {filename}]\n{content[:10000]}\n\n"  # Limit each file content
         
         # Generate response
         response = model.generate_content(
-            f"{context}\n\nUser question: {prompt}\n\nPlease answer the question based on the file content above."
+            f"Files content:\n{combined_content}\n\nUser question: {prompt}\n\nPlease answer based on the files content above."
         )
         
         return response.text
@@ -77,28 +112,22 @@ with st.sidebar:
     st.title("🤖 File Chat Assistant")
     st.markdown("---")
     
+    # API Configuration
     st.markdown("## 🔑 API Configuration")
     api_key = st.text_input("Enter Google Gemini API Key:", type="password", 
-                          help="Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)")
-    
+                         help="Get your key from [Google AI Studio](https://aistudio.google.com/app/apikey)")
     if api_key:
         st.session_state.api_key = api_key
     
-    st.markdown("---")
-    
+    # Model Settings
     st.markdown("## ⚙️ Model Settings")
     model_options = [
-        "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro","gemini-2.0-flash-lite","gemini-2.0-pro-exp-02-05",
-"gemini-2.0-flash-thinking-exp-01-21","gemini-2.5-pro-exp-03-25","gemini-1.5-flash-8b"
-        
+        "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-pro-exp-02-05",
+        "gemini-2.5-pro-exp-03-25", "gemini-1.5-flash-8b"
     ]
+    st.session_state.model = st.selectbox("Select Gemini Model:", model_options, index=0)
     
-    selected_model = st.selectbox("Select Gemini Model:", model_options, index=0)
-    st.session_state.model = selected_model
-    
-    st.markdown("---")
-    
-    # About section
+    # About Section
     st.markdown("## ℹ️ About")
     st.markdown("""
     This app allows you to chat with your files using Google's Gemini API.
@@ -108,57 +137,59 @@ with st.sidebar:
     - Word (.docx)
     - Text (.txt)
     - CSV (.csv)
+    - Excel (.xlsx)
+    - JSON (.json)
     
-    **Note:** File contents are processed locally and are not stored permanently.
+    **Note:** Files are processed locally and not stored permanently.
     """)
 
-# Main content area
+# Main content
 st.title("📁 Chat With Your Files")
-st.write("Upload a document and ask questions about its content")
+st.write("Upload one or more documents and ask questions about their content")
 
-# File upload section
-uploaded_file = st.file_uploader("Upload your file", type=["pdf", "docx", "txt", "csv"])
+# File upload section - Multiple files
+uploaded_files = st.file_uploader("Upload your files", type=["pdf", "docx", "txt", "csv", "xlsx", "json"], accept_multiple_files=True)
 
-if uploaded_file:
-    # Process the file
-    file_details = {"Filename": uploaded_file.name, "FileType": uploaded_file.type, "FileSize": f"{uploaded_file.size / 1024:.2f} KB"}
+if uploaded_files:
+    # Process each uploaded file
+    for uploaded_file in uploaded_files:
+        # Check if file was already processed
+        if uploaded_file.name not in st.session_state.files_content:
+            with st.spinner(f"Processing {uploaded_file.name}..."):
+                extracted_text, file_type = process_file(uploaded_file)
+                if extracted_text and file_type != "Error" and file_type != "Unsupported":
+                    st.session_state.files_content[uploaded_file.name] = extracted_text
+                    st.success(f"✅ {file_type} file '{uploaded_file.name}' processed successfully!")
+                else:
+                    st.error(f"❌ Could not process '{uploaded_file.name}': {extracted_text}")
     
-    with st.expander("File Details", expanded=False):
-        st.json(file_details)
-    
-    # Extract content based on file type
-    try:
-        with st.spinner("Processing file..."):
-            if uploaded_file.type == "application/pdf":
-                extracted_text = extract_text_from_pdf(uploaded_file)
-                file_type = "PDF"
-            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                extracted_text = extract_text_from_docx(uploaded_file)
-                file_type = "DOCX"
-            elif uploaded_file.type == "text/plain":
-                extracted_text = extract_text_from_txt(uploaded_file)
-                file_type = "TXT"
-            elif uploaded_file.type == "text/csv":
-                extracted_text = extract_text_from_csv(uploaded_file)
-                file_type = "CSV"
-            else:
-                st.error("Unsupported file type")
-                extracted_text = None
-                file_type = None
+    # Display files and allow removal
+    if st.session_state.files_content:
+        st.subheader("Processed Files")
+        cols = st.columns(3)
+        files_to_remove = []
         
-        if extracted_text:
-            st.session_state.file_content = extracted_text
-            st.session_state.file_name = uploaded_file.name
-            
-            with st.expander("Preview Content", expanded=False):
-                st.text_area("Extracted text:", extracted_text[:5000], height=300, disabled=True)
-                if len(extracted_text) > 5000:
-                    st.info(f"Showing first 5000 characters out of {len(extracted_text)} total characters")
-            
-            st.success(f"✅ {file_type} file processed successfully!")
-    
-    except Exception as e:
-        st.error(f"Error processing file: {str(e)}")
+        for idx, (filename, content) in enumerate(st.session_state.files_content.items()):
+            col_idx = idx % 3
+            with cols[col_idx]:
+                preview_key = f"preview_{filename}"
+                if st.button(f"👁️ Preview '{filename}'", key=preview_key):
+                    st.session_state[preview_key] = not st.session_state.get(preview_key, False)
+                
+                if st.session_state.get(preview_key, False):
+                    st.text_area(f"Content of {filename}:", content[:2000], height=200, disabled=True)
+                    if len(content) > 2000:
+                        st.info(f"Showing first 2000 of {len(content)} characters")
+                
+                if st.button(f"🗑️ Remove '{filename}'", key=f"remove_{filename}"):
+                    files_to_remove.append(filename)
+        
+        # Remove files marked for deletion
+        for filename in files_to_remove:
+            if filename in st.session_state.files_content:
+                del st.session_state.files_content[filename]
+                st.success(f"Removed '{filename}'")
+                st.rerun()
 
 # Chat interface
 st.header("💬 Chat")
@@ -171,15 +202,13 @@ with chat_container:
             st.markdown(f"**You:** {message['content']}")
         else:
             st.markdown(f"**AI:** {message['content']}")
-        
-        # Add a separator between messages except for the last one
         if i < len(st.session_state.chat_history) - 1:
             st.markdown("---")
 
 # User input
-user_question = st.text_input("Ask a question about your file:", key="user_input")
+user_question = st.text_input("Ask a question about your files:", key="user_input")
 
-# Submit button
+# Action buttons
 col1, col2 = st.columns([1, 5])
 with col1:
     submit_button = st.button("Ask 🔍", use_container_width=True)
@@ -192,18 +221,17 @@ with col2:
 if submit_button and user_question:
     if not st.session_state.api_key:
         st.error("Please enter your Gemini API key in the sidebar.")
-    elif not st.session_state.file_content:
-        st.warning("Please upload a file first.")
+    elif not st.session_state.files_content:
+        st.warning("Please upload at least one file first.")
     else:
         # Add user message to chat history
         st.session_state.chat_history.append({"role": "user", "content": user_question})
         
-        # Display "AI is thinking" message
+        # Generate AI response
         with st.spinner("AI is thinking..."):
-            # Generate AI response
             ai_response = generate_ai_response(
                 user_question, 
-                st.session_state.file_content, 
+                st.session_state.files_content, 
                 st.session_state.model, 
                 st.session_state.api_key
             )
@@ -211,20 +239,20 @@ if submit_button and user_question:
             # Add AI response to chat history
             st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
         
-        # Rerun the app to update the chat display
+        # Rerun to update chat display
         st.rerun()
 
-# Display a message if no file is uploaded
-if not st.session_state.file_content:
-    st.info("👆 Please upload a file to start chatting")
+# Display message if no files uploaded
+if not st.session_state.files_content:
+    st.info("👆 Please upload at least one file to start chatting")
 
-# Bottom area with tips
+# Tips for better results
 with st.expander("💡 Tips for better results"):
     st.markdown("""
-    - Ask specific questions about the content in your file
+    - Ask specific questions about the content in your files
+    - When working with multiple files, specify which file you're asking about
     - For large documents, try to reference specific sections or topics
-    - If the response seems incomplete, try breaking your question into smaller parts
-    - For CSV files, you can ask for specific data analysis or summaries
+    - For data files (CSV, Excel), you can ask for specific data analysis or summaries
     """)
 
 # Footer
