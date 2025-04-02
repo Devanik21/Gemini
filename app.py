@@ -135,6 +135,19 @@ with st.sidebar:
         "gemini-2.5-pro-exp-03-25", "gemini-1.5-flash-8b"
     ]
     st.session_state.model = st.selectbox("Select Gemini Model:", model_options, index=0)
+
+    # Gemma Section
+    st.markdown("## 🧠 Gemma Models")
+    gemma_options = [
+        "gemma-3-4b-it (Not multimodal)",
+        "gemma-3-12b-it (Multimodal)",
+        "gemma-3-27b-it (Multimodal)",
+        "gemma-2-2b-it (Not multimodal)",
+        "gemma-2-9b-it (Not multimodal)",
+        "gemma-2-27b-it (Not multimodal)"
+    ]
+    st.session_state.gemma_model = st.selectbox("Select Gemma Model:", gemma_options, index=0)
+
     
     # About Section
     st.markdown("## ℹ️ About")
