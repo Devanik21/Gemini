@@ -128,25 +128,25 @@ with st.sidebar:
     if api_key:
         st.session_state.api_key = api_key
     
-    # Model Settings
-    st.markdown("## ⚙️ Model Settings")
-    model_options = [
-        "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-pro-exp-02-05",
-        "gemini-2.5-pro-exp-03-25", "gemini-1.5-flash-8b"
-    ]
-    st.session_state.model = st.selectbox("Select Gemini Model:", model_options, index=0)
+    # Model Selection
+    st.markdown("## ⚙️ Model Selection")
+    model_options = {
+        "Gemini": [
+            "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro",
+            "gemini-2.0-pro-exp-02-05", "gemini-2.5-pro-exp-03-25", "gemini-1.5-flash-8b"
+        ],
+        "Gemma": [
+            "gemma-3-4b-it (Not multimodal)", "gemma-3-12b-it (Multimodal)", "gemma-3-27b-it (Multimodal)",
+            "gemma-2-2b-it (Not multimodal)", "gemma-2-9b-it (Not multimodal)", "gemma-2-27b-it (Not multimodal)"
+        ]
+    }
+    
+    model_type = st.radio("Select Model Type:", ["Gemini", "Gemma"])
+    selected_model = st.selectbox("Select Model:", model_options[model_type])
 
-    # Gemma Section
-    st.markdown("## 🧠 Gemma Models")
-    gemma_options = [
-        "gemma-3-4b-it (Not multimodal)",
-        "gemma-3-12b-it (Multimodal)",
-        "gemma-3-27b-it (Multimodal)",
-        "gemma-2-2b-it (Not multimodal)",
-        "gemma-2-9b-it (Not multimodal)",
-        "gemma-2-27b-it (Not multimodal)"
-    ]
-    st.session_state.gemma_model = st.selectbox("Select Gemma Model:", gemma_options, index=0)
+    # Store selected model
+    st.session_state.model = selected_model
+
 
     
     # About Section
