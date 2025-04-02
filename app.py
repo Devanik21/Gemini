@@ -163,33 +163,7 @@ if uploaded_files:
                 else:
                     st.error(f"❌ Could not process '{uploaded_file.name}': {extracted_text}")
     
-    # Display files and allow removal
-    if st.session_state.files_content:
-        st.subheader("Processed Files")
-        cols = st.columns(3)
-        files_to_remove = []
-        
-        for idx, (filename, content) in enumerate(st.session_state.files_content.items()):
-            col_idx = idx % 3
-            with cols[col_idx]:
-                preview_key = f"preview_{filename}"
-                if st.button(f"👁️ Preview '{filename}'", key=preview_key):
-                    st.session_state[preview_key] = not st.session_state.get(preview_key, False)
-                
-                if st.session_state.get(preview_key, False):
-                    st.text_area(f"Content of {filename}:", content[:2000], height=200, disabled=True)
-                    if len(content) > 2000:
-                        st.info(f"Showing first 2000 of {len(content)} characters")
-                
-                if st.button(f"🗑️ Remove '{filename}'", key=f"remove_{filename}"):
-                    files_to_remove.append(filename)
-        
-        # Remove files marked for deletion
-        for filename in files_to_remove:
-            if filename in st.session_state.files_content:
-                del st.session_state.files_content[filename]
-                st.success(f"Removed '{filename}'")
-                st.rerun()
+
 
 # Chat interface
 st.header("💬 Chat")
