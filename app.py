@@ -24,6 +24,8 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "files_content" not in st.session_state:
     st.session_state.files_content = {}
+if "last_uploaded_files" not in st.session_state:
+    st.session_state.last_uploaded_files = []
 
 # File extraction functions
 def extract_text_from_pdf(file):
@@ -98,9 +100,16 @@ def generate_ai_response(prompt, files_content, model_name, api_key):
         for filename, content in files_content.items():
             combined_content += f"[File: {filename}]\n{content[:10000]}\n\n"  # Limit each file content
         
-        # Generate response
+        # Generate response with clear instructions
         response = model.generate_content(
-            f"Files content:\n{combined_content}\n\nUser question: {prompt}\n\nPlease answer based on the files content above."
+            f"""Files content:
+{combined_content}
+
+User question: {prompt}
+
+IMPORTANT: Please answer based ONLY on the files content above. 
+Reference file names when providing information.
+DO NOT reference any previous conversations or files not listed above."""
         )
         
         return response.text
@@ -147,10 +156,27 @@ with st.sidebar:
 st.title("📁 Chat With Your Files")
 st.write("Upload one or more documents and ask questions about their content")
 
-# File upload section - Multiple files
-uploaded_files = st.file_uploader("Upload your files", type=["pdf", "docx", "txt", "csv", "xlsx", "json"], accept_multiple_files=True)
+# File management
+col1, col2 = st.columns([4, 1])
+with col1:
+    # File upload section - Multiple files
+    uploaded_files = st.file_uploader("Upload your files", type=["pdf", "docx", "txt", "csv", "xlsx", "json"], accept_multiple_files=True)
+with col2:
+    if st.button("Clear All Files", use_container_width=True):
+        st.session_state.files_content = {}
+        st.session_state.chat_history = []
+        st.session_state.last_uploaded_files = []
+        st.success("All files cleared")
+        st.rerun()
 
 if uploaded_files:
+    # Check if the uploaded files have changed
+    current_files = [file.name for file in uploaded_files]
+    if current_files != st.session_state.last_uploaded_files:
+        # Files changed, clear previous files
+        st.session_state.files_content = {}
+        st.session_state.last_uploaded_files = current_files
+    
     # Process each uploaded file
     for uploaded_file in uploaded_files:
         # Check if file was already processed
@@ -166,7 +192,8 @@ if uploaded_files:
     # Display summary of processed files
     if st.session_state.files_content:
         file_count = len(st.session_state.files_content)
-        st.success(f"✅ {file_count} file{'s' if file_count > 1 else ''} processed and ready for chat.")
+        file_names = ", ".join(st.session_state.files_content.keys())
+        st.success(f"✅ {file_count} file{'s' if file_count > 1 else ''} processed: {file_names}")
 
 # Chat interface
 st.header("💬 Chat")
