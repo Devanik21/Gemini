@@ -333,12 +333,7 @@ with chat_tab:
                 with st.chat_message("assistant"):
                     st.write(message["content"])
                     
-                    # Use i for unique keys 🩵
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.button("🔄 Regenerate", key=f"regen_{i}")
-                    with col2:
-                        st.button("💾 Save", key=f"save_{i}")
+ 
 
 
     # Display current research depth mode
