@@ -75,7 +75,7 @@ with st.sidebar:
                 st.error("Invalid API key")
     
     with st.expander("⚙️ Model Settings", expanded=True):
-        model_col1, model_col2 = st.columns([3, 1])
+        model_col1= st.columns([3, 1])
         
         with model_col1:
             model_option = st.selectbox(
@@ -83,15 +83,7 @@ with st.sidebar:
                 ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"]
             )
         
-        with model_col2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            info_tooltip = st.info("i")
-            if info_tooltip:
-                st.info("""
-                - gemini-1.5-pro: Best for complex research
-                - gemini-1.5-flash: Balanced speed/quality
-                - gemini-2.0-flash: Latest capabilities
-                """)
+
         
         temperature = st.slider("Temperature:", 0.0, 1.0, 0.7, 0.1)
         
