@@ -26,11 +26,11 @@ st.set_page_config(
 # Apply custom CSS
 st.markdown("""
 <style>
-    .main-header {background-color: #f0f8ff; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;}
+    .main-header {background-color: #420a45; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;}
     .chat-container {border-radius: 10px; padding: 0.5rem; margin-bottom: 1rem;}
     .file-box {background-color: #f5f5f5; border-radius: 5px; padding: 0.5rem; margin-bottom: 0.5rem;}
     .stButton>button {width: 100%;}
-    .research-block {background-color: #fffaf0; padding: 1rem; border-radius: 5px; margin: 1rem 0;}
+    .research-block {background-color: #420a45; padding: 1rem; border-radius: 5px; margin: 1rem 0;}
     .sidebar-header {text-align: center; padding: 1rem 0; border-bottom: 1px solid #e6e6e6;}
     div[data-testid="stVerticalBlock"] {gap: 0.5rem !important;}
 </style>
