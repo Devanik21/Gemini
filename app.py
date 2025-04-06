@@ -324,7 +324,7 @@ with chat_tab:
     chat_container = st.container(height=500, border=True)
     with chat_container:
         # Display chat messages with improved styling
-        for message in st.session_state.messages:
+        for i, message in enumerate(st.session_state.messages):  # 👈 Added i here
             if message["role"] == "system":
                 st.info(message["content"])
             elif message["role"] == "user":
@@ -333,12 +333,13 @@ with chat_tab:
                 with st.chat_message("assistant"):
                     st.write(message["content"])
                     
-                    # Keep only Regenerate and Save buttons
+                    # Use i for unique keys 🩵
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.button("🔄 Regenerate", key=f"regen_{len(st.session_state.messages)}")
+                        st.button("🔄 Regenerate", key=f"regen_{i}")
                     with col2:
-                        st.button("💾 Save", key=f"save_{len(st.session_state.messages)}")
+                        st.button("💾 Save", key=f"save_{i}")
+
 
     # Display current research depth mode
     st.caption(f"Currently using **{st.session_state.research_depth.capitalize()}** research depth")
