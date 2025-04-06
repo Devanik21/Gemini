@@ -313,7 +313,7 @@ Structure your response with clear sections, subsections, and thoroughly develop
     return base_prompt
 
 # Main UI with improved layout
-st.markdown('<div class="main-header"><h1>🧠 Research Assistant Pro</h1></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>AI chatbot</h1></div>', unsafe_allow_html=True)
 
 # Create tabs for chat and insights
 chat_tab, insights_tab = st.tabs(["💬 Chat Interface", "🔍 Research Insights"])
