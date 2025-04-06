@@ -333,15 +333,11 @@ with chat_tab:
                 with st.chat_message("assistant"):
                     st.write(message["content"])
                     
-                    # Add reaction buttons
-                    col1, col2, col3, col4 = st.columns(4)
+                    # Keep only Regenerate and Save buttons
+                    col1, col2 = st.columns(2)
                     with col1:
-                        st.button("👍", key=f"like_{len(st.session_state.messages)}")
-                    with col2:
-                        st.button("👎", key=f"dislike_{len(st.session_state.messages)}")
-                    with col3:
                         st.button("🔄 Regenerate", key=f"regen_{len(st.session_state.messages)}")
-                    with col4:
+                    with col2:
                         st.button("💾 Save", key=f"save_{len(st.session_state.messages)}")
 
     # Display current research depth mode
