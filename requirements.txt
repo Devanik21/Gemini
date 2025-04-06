@@ -1,6 +1,9 @@
 streamlit
 google-generativeai
-Pillow
 PyPDF2
 python-docx
-openpyxl
+pandas
+numpy
+plotly
+pillow
+requests
