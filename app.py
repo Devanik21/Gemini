@@ -17,8 +17,8 @@ from datetime import datetime
 
 # Initialize Streamlit app with improved layout and theme
 st.set_page_config(
-    page_title="Research Assistant Pro", 
-    page_icon="🧠", 
+    page_title="Gemini", 
+    page_icon="✨", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -62,7 +62,7 @@ if "analytics" not in st.session_state:
 
 # Sidebar with improved UI
 with st.sidebar:
-    st.markdown('<div class="sidebar-header"><h2>🧠 Research Assistant Pro</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-header"><h2>AI Chatbot</h2></div>', unsafe_allow_html=True)
     
     with st.expander("🔑 API Configuration", expanded=True):
         api_key = st.text_input("Enter API Key:", type="password")
