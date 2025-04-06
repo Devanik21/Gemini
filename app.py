@@ -17,8 +17,8 @@ from datetime import datetime
 
 # Initialize Streamlit app with improved layout and theme
 st.set_page_config(
-    page_title="Research Assistant Pro", 
-    page_icon="🧠", 
+    page_title="Gemini", 
+    page_icon="✨", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
