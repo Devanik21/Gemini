@@ -17,8 +17,8 @@ from datetime import datetime
 
 # Initialize Streamlit app with improved layout and theme
 st.set_page_config(
-    page_title="Gemini", 
-    page_icon="✨", 
+    page_title="Research Assistant Pro", 
+    page_icon="🧠", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -26,11 +26,11 @@ st.set_page_config(
 # Apply custom CSS
 st.markdown("""
 <style>
-    .main-header {background-color: #210826; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;}
+    .main-header {background-color: #f0f8ff; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;}
     .chat-container {border-radius: 10px; padding: 0.5rem; margin-bottom: 1rem;}
-    .file-box {background-color: #210826; border-radius: 5px; padding: 0.5rem; margin-bottom: 0.5rem;}
+    .file-box {background-color: #f5f5f5; border-radius: 5px; padding: 0.5rem; margin-bottom: 0.5rem;}
     .stButton>button {width: 100%;}
-    .research-block {background-color: #210826; padding: 1rem; border-radius: 5px; margin: 1rem 0;}
+    .research-block {background-color: #fffaf0; padding: 1rem; border-radius: 5px; margin: 1rem 0;}
     .sidebar-header {text-align: center; padding: 1rem 0; border-bottom: 1px solid #e6e6e6;}
     div[data-testid="stVerticalBlock"] {gap: 0.5rem !important;}
 </style>
@@ -216,9 +216,9 @@ with st.sidebar:
     
     # Clear chat button with confirmation
     if st.session_state.messages:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            confirm = st.checkbox("Confirm clear")
-            if confirm:
+        confirm = st.checkbox("✅ Confirm clear chat")
+        if confirm:
+            if st.button("🗑️ Clear Chat", use_container_width=True):
                 st.session_state.messages = []
                 st.session_state.analytics["queries"] = 0
                 st.session_state.analytics["topics"] = []
