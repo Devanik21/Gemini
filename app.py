@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Streamlit App Title
-st.set_page_config(page_title="Gemini Chatbot 💬✨", layout="wide")
+st.set_page_config(page_title="✨ Gemini Chatbot", layout="wide")
 st.title("💎 Gemini Chatbot")
 
 # Sidebar - API Key Input
@@ -12,9 +12,9 @@ with st.sidebar:
     if api_key:
         genai.configure(api_key=api_key)
 
-        st.success("API key set successfully! 💖", icon="✅")
+        st.success("API key set successfully!", icon="✅")
     else:
-        st.warning("Please enter your Gemini API key to start chatting 🌸", icon="⚠️")
+        st.warning("Please enter your Gemini API key to start chatting ", icon="⚠️")
 
 # Initialize chat history
 if "messages" not in st.session_state:
