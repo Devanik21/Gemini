@@ -35,16 +35,25 @@ for msg in st.session_state.messages:
 
 # User Input
 if api_key:
-    user_prompt = st.chat_input("Type your message here 💬")
-    if user_prompt:
-        # Show user message
-        st.chat_message("user").markdown(user_prompt)
-        st.session_state.messages.append({"role": "user", "content": user_prompt})
+    col1, col2 = st.columns([0.1, 0.9])
 
-        # Send to Gemini
-        response = st.session_state.chat.send_message(user_prompt)
-        reply = response.text
+    with col1:
+        uploaded_file = st.file_uploader(" ", type=["pdf"], label_visibility="collapsed")
+        if uploaded_file:
+            st.toast("📄 PDF uploaded! (But I'm not reading it yet~ 💖)", icon="📎")
 
-        # Show bot response
-        st.chat_message("assistant").markdown(reply)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+    with col2:
+        user_prompt = st.chat_input("Type your message here 💬")
+        if user_prompt:
+            # Show user message
+            st.chat_message("user").markdown(user_prompt)
+            st.session_state.messages.append({"role": "user", "content": user_prompt})
+
+            # Send to Gemini
+            response = st.session_state.chat.send_message(user_prompt)
+            reply = response.text
+
+            # Show bot response
+            st.chat_message("assistant").markdown(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+
