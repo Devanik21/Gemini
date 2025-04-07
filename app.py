@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Streamlit App Title
-st.set_page_config(page_title="Gemini Chatbot (beta)", layout="wide", page_icon="💎")
+st.set_page_config(page_title="Gemini Chatbot", layout="wide", page_icon="💎")
 st.title("💎 Gemini Chatbot")
 
 # Sidebar - API Key Input and Clear Button
@@ -33,35 +33,48 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-import streamlit.components.v1 as components
-
+# User Input
 if api_key:
-    with st.container():
-        col1, col2 = st.columns([0.1, 0.9])
+    user_prompt = st.chat_input("Type your message here 💬")
+    if user_prompt:
+        # Show user message
+        st.chat_message("user").markdown(user_prompt)
+        st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-        with col1:
-            # Minimalist + icon as file uploader
-            uploaded_file = st.file_uploader(
-                label="➕",
-                type=["pdf"],
-                label_visibility="collapsed"
-            )
-            if uploaded_file:
-                st.toast("📎 PDF uploaded! (Not reading it yet~ stay tuned)", icon="📄")
+        # Send to Gemini
+        response = st.session_state.chat.send_message(user_prompt)
+        reply = response.text
 
-        with col2:
-            user_prompt = st.chat_input("Type your message here 💬")
-            if user_prompt:
-                # Show user message
-                st.chat_message("user").markdown(user_prompt)
-                st.session_state.messages.append({"role": "user", "content": user_prompt})
-
-                # Send to Gemini
-                response = st.session_state.chat.send_message(user_prompt)
-                reply = response.text
-
-                # Show bot response
-                st.chat_message("assistant").markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
+        # Show bot response
+        st.chat_message("assistant").markdown(reply)
+        st.session_state.messages.append({"role": "assistant", "content": reply})
 
 
+
+
+
+
+
+'''if api_key:
+    col1, col2 = st.columns([0.1, 0.9])
+
+    with col1:
+        uploaded_file = st.file_uploader(" ", type=["pdf"], label_visibility="collapsed")
+        if uploaded_file:
+            st.toast("📄 PDF uploaded! (But I'm not reading it yet~ 💖)", icon="📎")
+
+    with col2:
+        user_prompt = st.chat_input("Type your message here 💬")
+        if user_prompt:
+            # Show user message
+            st.chat_message("user").markdown(user_prompt)
+            st.session_state.messages.append({"role": "user", "content": user_prompt})
+
+            # Send to Gemini
+            response = st.session_state.chat.send_message(user_prompt)
+            reply = response.text
+
+            # Show bot response
+            st.chat_message("assistant").markdown(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+'''
