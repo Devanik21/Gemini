@@ -1,5 +1,15 @@
 
 '''
+Replace this:(for file upload)(not working)
+
+
+if api_key:
+    user_prompt = st.chat_input("Type your message here 💬")
+
+    
+With this:
+
+
 
 if api_key:
     col1, col2 = st.columns([0.1, 0.9])
