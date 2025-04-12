@@ -52,7 +52,7 @@ name = st.text_input("Please enter your name ", value=" ")
 
 # Simple greeting
 if name:
-    st.markdown(f"### Hello, **{name}**! 💫 So happy to see you here~ ")
+    st.markdown(f"### Hello, {name} 💫 let's explore together~ ")
 
 
 
