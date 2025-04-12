@@ -1,21 +1,30 @@
 import streamlit as st
 import google.generativeai as genai
+from fpdf import FPDF
+import os
 
 # Page settings
-st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
-st.title(" 💎 Gemini ")
+st.set_page_config(page_title="Gemini Pro", layout="wide", page_icon="💎")
+st.title(" 💎 Gemini Pro – Multi-Mode Chat Assistant")
 
 # Name input
-name = st.text_input("Please enter your name ", value=" ")
-
+name = st.text_input("Please enter your name", value=" ")
 if name.strip():
-    st.markdown(f"### Hello {name},  let's explore together 💫 ")
+    st.markdown(f"### Hello {name}, ready to explore ideas? ⚡")
 
-# Sidebar
+# Sidebar - API, Chat Mode, Clear
 with st.sidebar:
     st.header("🔐 Gemini API Settings")
     api_key = st.text_input("Enter your Gemini API key:", type="password")
 
+    st.markdown("---")
+    chat_mode = st.selectbox(
+        "🧠 Select Chat Mode",
+        ["Normal", "Deep Research", "Creative", "Explain Like I'm 5", "Code Helper"]
+    )
+
+    st.markdown("---")
+    export_pdf = st.button("📤 Export Last Response to PDF")
     if st.button("🧹 Clear Chat"):
         st.session_state.messages = []
         if "chat" in st.session_state:
@@ -26,84 +35,92 @@ with st.sidebar:
         genai.configure(api_key=api_key)
         st.success("API key set successfully!", icon="✅")
     else:
-        st.warning("Please enter your Gemini API key to start chatting", icon="⚠️")
+        st.warning("Enter Gemini API key to begin", icon="⚠️")
 
-    # Deep Research Toggle
-    st.markdown("---")
-    deep_research = st.checkbox("🔍 Enable Deep Research Mode", value=False)
-
-# Initialize chat and history
+# Initialize session
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "chat" not in st.session_state and api_key:
     st.session_state.chat = genai.GenerativeModel(
-        model_name="gemini-2.0-pro",  # Use the full token limit model
+        model_name="gemini-2.0-pro",
         generation_config={"max_output_tokens": 8192}
     ).start_chat(history=[])
 
-# Display past messages
+# Show chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Main chat input
+# PDF Export Function
+def export_to_pdf(text, filename="gemini_response.pdf"):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
+
+    for line in text.split("\n"):
+        pdf.multi_cell(0, 10, line)
+
+    pdf.output(filename)
+    return filename
+
+# Chat input
 if api_key:
-    user_prompt = st.chat_input("Type your message here 💬")
+    user_prompt = st.chat_input("Ask anything 💬")
 
     if user_prompt:
         st.chat_message("user").markdown(user_prompt)
         st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-        # Deep Research Mode Prompting
-        if deep_research:
-            research_prompt = f"""
-You are a deeply knowledgeable, high-level research assistant with expertise in technical, scientific, and academic writing.
-
-You are tasked with generating an in-depth, structured response of up to 8000 words (8192 tokens). The output should feel like a high-quality research article or whitepaper, suitable for university-level work, academic publication, or investor/industry analysis.
-
-Follow these guidelines:
-
----
-
-🔍 Objective:
-Answer the user’s query with academic rigor, depth, and completeness.
-
----
-
-✍️ Structure:
-
-1. Executive Summary  
-2. Introduction  
-3. Historical Context  
-4. Core Concepts  
-5. Current State  
-6. Challenges & Debates  
-7. Applications & Use Cases  
-8. Comparative Analysis  
-9. Future Outlook  
-10. Conclusion  
+        # Prepare system prompt for different modes
+        if chat_mode == "Deep Research":
+            system_prompt = f"""
+You are a high-level research assistant writing in-depth academic responses. 
+Structure the output as a formal article (~8000 tokens) with:
+1. Executive Summary
+2. Introduction
+3. History & Evolution
+4. Concepts & Frameworks
+5. Current State
+6. Challenges
+7. Applications
+8. Comparisons
+9. Future Outlook
+10. Conclusion
 11. References (Optional)
 
----
-
-📑 Formatting:
-- Markdown-friendly
-- Use headings, bullets, code blocks (if applicable)
-- Authoritative tone
-- No token/word restriction; go as deep as needed
-
----
-
-🗨️ Query:
+Query:
 \"\"\"{user_prompt}\"\"\"
-
-Begin now.
 """
-            response = st.session_state.chat.send_message(research_prompt)
+        elif chat_mode == "Creative":
+            system_prompt = f"You are a wildly creative storyteller and ideator. Think like a novelist or futurist. Respond creatively to: {user_prompt}"
+        elif chat_mode == "Explain Like I'm 5":
+            system_prompt = f"Explain this like I’m 5 years old: {user_prompt}"
+        elif chat_mode == "Code Helper":
+            system_prompt = f"You are a coding assistant. Explain, debug, or generate code for this prompt: {user_prompt}"
         else:
-            response = st.session_state.chat.send_message(user_prompt)
+            system_prompt = user_prompt
 
+        # Get response from Gemini
+        response = st.session_state.chat.send_message(system_prompt)
         reply = response.text
+
         st.chat_message("assistant").markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
+
+        # Save last reply to export
+        st.session_state.last_reply = reply
+
+# Export last response to PDF
+if export_pdf:
+    if "last_reply" in st.session_state:
+        filename = export_to_pdf(st.session_state.last_reply)
+        with open(filename, "rb") as f:
+            st.download_button(
+                label="📄 Download PDF",
+                data=f,
+                file_name=filename,
+                mime="application/pdf"
+            )
+    else:
+        st.warning("No reply available to export yet.")
