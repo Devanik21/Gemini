@@ -42,7 +42,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "chat" not in st.session_state and api_key:
     st.session_state.chat = genai.GenerativeModel(
-        model_name="gemini-2.0-pro",
+        model_name="gemini-2.0-flash",
         generation_config={"max_output_tokens": 8192}
     ).start_chat(history=[])
 
