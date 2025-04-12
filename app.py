@@ -40,9 +40,33 @@ if api_key:
 import streamlit as st
 import google.generativeai as genai
 
-# Streamlit App Title
+import streamlit as st
+from datetime import datetime
+
+# Page settings
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
-st.title(" Gemini ")
+st.title(" 💎 Gemini ")
+
+# Name input
+name = st.text_input("Hey explorer! What's your name? 💬", value="Prince")
+
+# Time-based greeting
+def get_greeting():
+    hour = datetime.now().hour
+    if 5 <= hour < 12:
+        return "Good morning 🌅"
+    elif 12 <= hour < 17:
+        return "Good afternoon ☀️"
+    elif 17 <= hour < 21:
+        return "Good evening 🌇"
+    else:
+        return "Good night 🌙"
+
+# Show the greeting
+if name:
+    greeting = get_greeting()
+    st.markdown(f"### {greeting}, **{name}**! 💖 Hope you're having a wonderful day! ")
+
 
 # Sidebar - API Key Input and Clear Button
 with st.sidebar:
