@@ -7,4 +7,5 @@ numpy
 plotly
 pillow
 requests
+fpdf
 openpyxl
