@@ -41,7 +41,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Streamlit App Title
-st.set_page_config(page_title="Gemini Chatbot", layout="wide", page_icon="💎")
+st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 st.title("💎 Gemini Chatbot")
 
 # Sidebar - API Key Input and Clear Button
