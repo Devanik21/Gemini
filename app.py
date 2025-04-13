@@ -485,172 +485,338 @@ else:  # File Upload mode
     }
     </style>
 
-    <h2 class='upload-gradient'>Document Upload</h2>
+    <h2 class='upload-gradient'>Document Upload & Analysis</h2>
     """, unsafe_allow_html=True)
     
     # Initialize session state for uploaded files
     if "uploaded_files" not in st.session_state:
         st.session_state.uploaded_files = []
+    
+    # Initialize session data for file chat
+    if "file_messages" not in st.session_state:
+        st.session_state.file_messages = []
+    
+    # Initialize chat for file mode if not exists
+    if "file_chat" not in st.session_state and "api_key" in st.session_state and st.session_state.api_key:
+        st.session_state.file_chat = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            generation_config={
+                "max_output_tokens": 8192,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40
+            }
+        ).start_chat(history=[])
         
     # Create upload directory if it doesn't exist
     upload_dir = "uploaded_files"
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
     
-    # File uploader
-    st.markdown("### Upload Documents")
-    st.markdown("Supported formats: PDF, DOCX, TXT, CSV, JSON, MD, PPTX, XLSX, HTML")
-    
-    uploaded_files = st.file_uploader(
-        "Choose files to upload:",
-        accept_multiple_files=True,
-        type=["pdf", "docx", "txt", "csv", "json", "md", "pptx", "xlsx", "html"]
-    )
-    
-    if uploaded_files:
-        st.success(f"{len(uploaded_files)} file(s) selected")
+    # API Key field in sidebar for file mode
+    with st.sidebar:
+        st.header("🔐 Gemini API Settings")
+        api_key = st.text_input("Enter your Gemini API key:", type="password", key="file_api_key")
         
-        # Process button
-        if st.button("Upload Files"):
-            for uploaded_file in uploaded_files:
-                # Create a unique filename with timestamp
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"{timestamp}_{uploaded_file.name}"
-                file_path = os.path.join(upload_dir, filename)
-                
-                # Save the file
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                
-                # Add to session state
-                file_info = {
-                    "name": uploaded_file.name,
-                    "path": file_path,
-                    "type": uploaded_file.type,
-                    "size": uploaded_file.size,
-                    "timestamp": timestamp
-                }
-                st.session_state.uploaded_files.append(file_info)
+        if api_key:
+            genai.configure(api_key=api_key)
+            st.session_state.api_key = api_key
+            st.success("API key set successfully!", icon="✅")
             
-            st.success(f"Successfully uploaded {len(uploaded_files)} files!")
-    
-    # Display uploaded files
-    if st.session_state.uploaded_files:
-        st.markdown("### Your Uploaded Documents")
+            # Initialize chat for file mode if not exists
+            if "file_chat" not in st.session_state:
+                st.session_state.file_chat = genai.GenerativeModel(
+                    model_name="gemini-2.0-flash",
+                    generation_config={
+                        "max_output_tokens": 8192,
+                        "temperature": 0.7,
+                        "top_p": 0.95,
+                        "top_k": 40
+                    }
+                ).start_chat(history=[])
+        else:
+            st.warning("Enter Gemini API key to begin", icon="⚠️")
         
-        for i, file_info in enumerate(st.session_state.uploaded_files):
-            col1, col2, col3 = st.columns([3, 1, 1])
-            
-            with col1:
-                st.write(f"**{file_info['name']}**")
-                st.caption(f"Size: {file_info['size']/1024:.1f} KB | Uploaded: {file_info['timestamp']}")
-            
-            with col2:
-                # Determine if file is readable in-app
-                viewable_types = ["txt", "csv", "json", "md", "html"]
-                file_ext = file_info['name'].split('.')[-1].lower()
+        # Chat mode selection for file chat
+        st.markdown("---")
+        file_chat_mode = st.selectbox(
+            "🧠 Select Chat Mode for Files",
+            [
+                "Document Analysis",
+                "Normal",
+                "Explain Like I'm 5",
+                "Summarizer",
+                "Q&A Expert"
+            ]
+        )
+        
+        # Clear file chat
+        if st.button("🧹 Clear File Chat"):
+            st.session_state.file_messages = []
+            if "file_chat" in st.session_state:
+                del st.session_state.file_chat
                 
-                if file_ext in viewable_types:
-                    if st.button("View", key=f"view_{i}"):
-                        with open(file_info['path'], 'r') as f:
-                            content = f.read()
-                            st.text_area("File Content", value=content, height=300)
+                # Reinitialize chat
+                if "api_key" in st.session_state and st.session_state.api_key:
+                    st.session_state.file_chat = genai.GenerativeModel(
+                        model_name="gemini-2.0-flash",
+                        generation_config={
+                            "max_output_tokens": 8192,
+                            "temperature": 0.7,
+                            "top_p": 0.95,
+                            "top_k": 40
+                        }
+                    ).start_chat(history=[])
+            st.success("File chat history cleared!")
+            st.rerun()
+    
+    # Two columns: File Upload and Chat
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        # File uploader
+        st.subheader("📁 Upload Documents")
+        st.markdown("Supported formats: PDF, DOCX, TXT, CSV, JSON, MD, PPTX, XLSX, HTML")
+        
+        uploaded_files = st.file_uploader(
+            "Choose files to upload:",
+            accept_multiple_files=True,
+            type=["pdf", "docx", "txt", "csv", "json", "md", "pptx", "xlsx", "html"]
+        )
+        
+        if uploaded_files:
+            st.success(f"{len(uploaded_files)} file(s) selected")
             
-            with col3:
-                if st.button("Delete", key=f"delete_{i}"):
-                    # Remove file from disk
+            # Process button
+            if st.button("Upload Files"):
+                for uploaded_file in uploaded_files:
+                    # Create a unique filename with timestamp
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"{timestamp}_{uploaded_file.name}"
+                    file_path = os.path.join(upload_dir, filename)
+                    
+                    # Save the file
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Add to session state
+                    file_info = {
+                        "name": uploaded_file.name,
+                        "path": file_path,
+                        "type": uploaded_file.type,
+                        "size": uploaded_file.size,
+                        "timestamp": timestamp
+                    }
+                    st.session_state.uploaded_files.append(file_info)
+                
+                st.success(f"Successfully uploaded {len(uploaded_files)} files!")
+        
+        # Display uploaded files
+        if st.session_state.uploaded_files:
+            st.markdown("### Your Uploaded Documents")
+            
+            for i, file_info in enumerate(st.session_state.uploaded_files):
+                col_a, col_b, col_c = st.columns([3, 1, 1])
+                
+                with col_a:
+                    st.write(f"**{file_info['name']}**")
+                    st.caption(f"Size: {file_info['size']/1024:.1f} KB | Uploaded: {file_info['timestamp']}")
+                
+                with col_b:
+                    # Determine if file is readable in-app
+                    viewable_types = ["txt", "csv", "json", "md", "html"]
+                    file_ext = file_info['name'].split('.')[-1].lower()
+                    
+                    if file_ext in viewable_types:
+                        if st.button("View", key=f"view_{i}"):
+                            with open(file_info['path'], 'r') as f:
+                                content = f.read()
+                                st.text_area("File Content", value=content, height=300)
+                
+                with col_c:
+                    if st.button("Delete", key=f"delete_{i}"):
+                        # Remove file from disk
+                        if os.path.exists(file_info['path']):
+                            os.remove(file_info['path'])
+                        
+                        # Remove from session state
+                        st.session_state.uploaded_files.pop(i)
+                        st.success(f"Deleted {file_info['name']}")
+                        st.rerun()
+                
+                st.markdown("---")
+            
+            # Clear all button
+            if st.button("Clear All Files"):
+                # Remove all files from disk
+                for file_info in st.session_state.uploaded_files:
                     if os.path.exists(file_info['path']):
                         os.remove(file_info['path'])
-                    
-                    # Remove from session state
-                    st.session_state.uploaded_files.pop(i)
-                    st.success(f"Deleted {file_info['name']}")
-                    st.rerun()
-            
-            st.markdown("---")
-        
-        # Clear all button
-        if st.button("Clear All Files"):
-            # Remove all files from disk
-            for file_info in st.session_state.uploaded_files:
-                if os.path.exists(file_info['path']):
-                    os.remove(file_info['path'])
-            
-            # Clear session state
-            st.session_state.uploaded_files = []
-            st.success("All files cleared!")
-            st.rerun()
-            
-    # Add basic file analysis options
-    if st.session_state.uploaded_files:
-        st.markdown("### File Analysis")
-        
-        file_options = [f"{file['name']}" for file in st.session_state.uploaded_files]
-        selected_file = st.selectbox("Select a file to analyze:", file_options)
-        
-        if selected_file:
-            selected_index = file_options.index(selected_file)
-            file_info = st.session_state.uploaded_files[selected_index]
-            file_ext = file_info['name'].split('.')[-1].lower()
-            
-            # Show different analysis options based on file type
-            if file_ext == 'csv':
-                st.markdown("#### CSV Analysis")
-                if st.button("Analyze CSV"):
-                    try:
-                        df = pd.read_csv(file_info['path'])
-                        st.write("#### Preview")
-                        st.dataframe(df.head())
-                        st.write("#### Summary Statistics")
-                        st.write(df.describe())
-                    except Exception as e:
-                        st.error(f"Error analyzing CSV: {e}")
-            
-            elif file_ext in ['xlsx', 'xls']:
-                st.markdown("#### Excel Analysis")
-                if st.button("Analyze Excel"):
-                    try:
-                        xls = pd.ExcelFile(file_info['path'])
-                        sheet_name = st.selectbox("Select sheet:", xls.sheet_names)
-                        df = pd.read_excel(file_info['path'], sheet_name=sheet_name)
-                        st.write("#### Preview")
-                        st.dataframe(df.head())
-                    except Exception as e:
-                        st.error(f"Error analyzing Excel file: {e}")
-            
-            elif file_ext == 'txt' or file_ext == 'md':
-                st.markdown("#### Text Analysis")
-                if st.button("Analyze Text"):
-                    try:
-                        with open(file_info['path'], 'r') as f:
-                            content = f.read()
-                            
-                        st.write(f"Character count: {len(content)}")
-                        st.write(f"Word count: {len(content.split())}")
-                        st.write(f"Line count: {len(content.splitlines())}")
-                    except Exception as e:
-                        st.error(f"Error analyzing text: {e}")
-            
-            # Add PDF analysis option
-            elif file_ext == 'pdf':
-                st.markdown("#### PDF Analysis")
-                st.info("PDF content preview and analysis will be available in the chat mode.")
-                st.warning("For advanced PDF processing, you'll need to install additional libraries like PyPDF2 or pdf2image.")
                 
-            # Add DOCX analysis option
-            elif file_ext == 'docx':
-                st.markdown("#### DOCX Analysis")
-                st.info("DOCX content preview and analysis will be available in the chat mode.")
-                st.warning("For advanced DOCX processing, you'll need to install additional libraries like python-docx.")
+                # Clear session state
+                st.session_state.uploaded_files = []
+                st.success("All files cleared!")
+                st.rerun()
+                
+        # Add basic file analysis options
+        if st.session_state.uploaded_files:
+            st.markdown("### Quick Analysis Tools")
+            
+            file_options = [f"{file['name']}" for file in st.session_state.uploaded_files]
+            selected_file = st.selectbox("Select a file to analyze:", file_options, key="quick_analysis_selector")
+            
+            if selected_file:
+                selected_index = file_options.index(selected_file)
+                file_info = st.session_state.uploaded_files[selected_index]
+                file_ext = file_info['name'].split('.')[-1].lower()
+                
+                # Show different analysis options based on file type
+                if file_ext == 'csv':
+                    st.markdown("#### CSV Analysis")
+                    if st.button("Analyze CSV"):
+                        try:
+                            df = pd.read_csv(file_info['path'])
+                            st.write("#### Preview")
+                            st.dataframe(df.head())
+                            st.write("#### Summary Statistics")
+                            st.write(df.describe())
+                        except Exception as e:
+                            st.error(f"Error analyzing CSV: {e}")
+                
+                elif file_ext in ['xlsx', 'xls']:
+                    st.markdown("#### Excel Analysis")
+                    if st.button("Analyze Excel"):
+                        try:
+                            xls = pd.ExcelFile(file_info['path'])
+                            sheet_name = st.selectbox("Select sheet:", xls.sheet_names)
+                            df = pd.read_excel(file_info['path'], sheet_name=sheet_name)
+                            st.write("#### Preview")
+                            st.dataframe(df.head())
+                        except Exception as e:
+                            st.error(f"Error analyzing Excel file: {e}")
+                
+                elif file_ext == 'txt' or file_ext == 'md':
+                    st.markdown("#### Text Analysis")
+                    if st.button("Analyze Text"):
+                        try:
+                            with open(file_info['path'], 'r') as f:
+                                content = f.read()
+                                
+                            st.write(f"Character count: {len(content)}")
+                            st.write(f"Word count: {len(content.split())}")
+                            st.write(f"Line count: {len(content.splitlines())}")
+                        except Exception as e:
+                            st.error(f"Error analyzing text: {e}")
+    
+    with col2:
+        st.subheader("💬 Chat with Your Documents")
         
-    # Instructions for using files with the chat
-    st.markdown("""
-    ### Using Files with Chat
-    
-    After uploading documents, switch back to Chat mode to:
-    1. Ask questions about your documents
-    2. Analyze document content
-    3. Compare multiple documents
-    
-    Your uploaded files will remain available during your session.
-    """)
+        # File selection for chat
+        if st.session_state.uploaded_files:
+            file_options = [f"{file['name']}" for file in st.session_state.uploaded_files]
+            selected_chat_file = st.selectbox("Select a file to discuss:", file_options, key="file_chat_selector")
+            
+            if selected_chat_file:
+                selected_index = file_options.index(selected_chat_file)
+                file_info = st.session_state.uploaded_files[selected_index]
+                
+                st.info(f"Ask questions about '{selected_chat_file}'")
+                
+                # Display file chat history
+                for msg in st.session_state.file_messages:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
+                
+                # Chat input for file chat
+                file_prompt = st.chat_input("Ask about your document...")
+                
+                if file_prompt and "api_key" in st.session_state and st.session_state.api_key:
+                    # Display user message
+                    st.chat_message("user").markdown(file_prompt)
+                    st.session_state.file_messages.append({"role": "user", "content": file_prompt})
+                    
+                    # Prepare file-specific prompt based on chat mode
+                    if file_chat_mode == "Document Analysis":
+                        system_prompt = f"""
+                        Analyze the following document named '{selected_chat_file}' 
+                        with this question or request: {file_prompt}
+                        
+                        Provide a comprehensive analysis with key insights.
+                        """
+                    elif file_chat_mode == "Explain Like I'm 5":
+                        system_prompt = f"""
+                        Explain the content from the document '{selected_chat_file}' 
+                        in simple terms that a 5-year old could understand.
+                        
+                        Question: {file_prompt}
+                        """
+                    elif file_chat_mode == "Summarizer":
+                        system_prompt = f"""
+                        Summarize the key points from '{selected_chat_file}' 
+                        focusing on: {file_prompt}
+                        """
+                    elif file_chat_mode == "Q&A Expert":
+                        system_prompt = f"""
+                        Based on the document '{selected_chat_file}', 
+                        answer this question in detail: {file_prompt}
+                        """
+                    else:  # Normal mode
+                        system_prompt = f"""
+                        Regarding the document '{selected_chat_file}': {file_prompt}
+                        """
+                    
+                    # Get response
+                    with st.spinner("Analyzing document..."):
+                        if "file_chat" in st.session_state:
+                            try:
+                                response = st.session_state.file_chat.send_message(system_prompt)
+                                reply = response.text
+                                
+                                # Display response
+                                st.chat_message("assistant").markdown(reply)
+                                st.session_state.file_messages.append({"role": "assistant", "content": reply})
+                            except Exception as e:
+                                st.error(f"Error processing request: {str(e)}")
+                
+                # Add export options for file chat
+                if st.session_state.file_messages:
+                    if st.button("Export File Chat"):
+                        export_filename = f"file_chat_{selected_chat_file}_{datetime.now().strftime('%Y%m%d')}.json"
+                        export_data = {
+                            "filename": selected_chat_file,
+                            "messages": st.session_state.file_messages,
+                            "export_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "chat_mode": file_chat_mode
+                        }
+                        
+                        with open(export_filename, "w") as f:
+                            json.dump(export_data, f, indent=4)
+                        
+                        with open(export_filename, "rb") as f:
+                            st.download_button(
+                                label="📄 Download Chat History",
+                                data=f,
+                                file_name=export_filename,
+                                mime="application/json"
+                            )
+        else:
+            st.info("Upload files to start chatting about them")
+            
+            # Add a sample of what users can ask
+            st.markdown("""
+            ### Example Questions You Can Ask About Documents
+            - "Summarize the key points in this document"
+            - "What are the main topics covered?"
+            - "Extract all dates mentioned in the text"
+            - "Find all numerical data and statistics"
+            - "Compare this with another document"
+            - "What conclusions does this document make?"
+            """)
+
+# Add a footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #888;">
+    <p>Powered by Google Gemini API | App Version 1.0</p>
+</div>
+""", unsafe_allow_html=True)
