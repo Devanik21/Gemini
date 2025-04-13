@@ -13,63 +13,40 @@ import streamlit as st
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
 # Blurry Gradient Background Style
+# Add this after st.set_page_config(...)
 st.markdown("""
     <style>
-    body {
-        background: linear-gradient(120deg, #4f46e5, #ec4899, #f97316);
-        background-size: 300% 300%;
-        animation: gradientMove 12s ease infinite;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-    }
-
-    @keyframes gradientMove {
-        0% {background-position: 0% 50%;}
-        50% {background-position: 100% 50%;}
-        100% {background-position: 0% 50%;}
-    }
-
+    /* Main App Container */
     .stApp {
-        background: transparent !important;
+        background: linear-gradient(135deg, #3a0ca3, #7209b7, #f72585);
+        background-size: 400% 400%;
+        animation: moveGradient 20s ease infinite;
+        filter: blur(0px);
+        overflow: hidden;
     }
 
-    .css-18e3th9 {
-        background: transparent !important;
+    @keyframes moveGradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
 
+    /* Optional frosted glass effect on blocks */
     .block-container {
-        backdrop-filter: blur(4px);
-        background-color: rgba(255, 255, 255, 0.05);
+        background-color: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border-radius: 16px;
-        padding: 1.5rem;
+        padding: 2rem;
+        color: white;
+    }
+
+    /* Hide Streamlit's default white box */
+    .css-18ni7ap, .css-1dp5vir {
+        background: transparent !important;
     }
     </style>
 """, unsafe_allow_html=True)
-
-
-# Gradient-styled title using HTML
-gradient_title = """
-<style>
-@keyframes gradient {
-  0% {background-position: 0%;}
-  100% {background-position: 100%;}
-}
-.animated-gradient {
-  font-size: 64px;
-  font-weight: bold;
-  text-align: center;
-  background: linear-gradient(90deg, #4f46e5, #ec4899, #4f46e5);
-  background-size: 200%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: gradient 3s infinite linear;
-  font-family: "Segoe UI", sans-serif;
-}
-</style>
-
-<h1 class='animated-gradient'> Gemini</h1>
-"""
-st.markdown(gradient_title, unsafe_allow_html=True)
 
 
 name = st.text_input("Please enter your name", value=" ")
