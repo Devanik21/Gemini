@@ -9,8 +9,6 @@ from datetime import datetime
 # Page settings
 
 
-# Page config
-st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
 # Gradient-styled title using HTML
 gradient_title = """
