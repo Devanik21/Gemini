@@ -37,6 +37,31 @@ gradient_title = """
 st.markdown(gradient_title, unsafe_allow_html=True)
 
 
+name = st.text_input("Please enter your name", value=" ")
+
+if name.strip():
+    st.markdown(f"""
+        <style>
+        @keyframes gradientShift {{
+            0% {{ background-position: 0%; }}
+            100% {{ background-position: 100%; }}
+        }}
+        .animated-greeting {{
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+            background-size: 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 4s linear infinite;
+            font-family: "Segoe UI", sans-serif;
+            margin-top: 10px;
+        }}
+        </style>
+
+        <h3 class='animated-greeting'>Hello, {name}, ready to explore ideas? ⚡</h3>
+    """, unsafe_allow_html=True)
 
 
 # Initialize session data for settings and themes
@@ -58,22 +83,7 @@ if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = {}
 
 # Name input
-name = st.text_input("Please enter your name", value=" ")
 
-if name.strip():
-    st.markdown(f"""
-        <h3 style='
-            font-size: 36px;
-            font-weight: bold;
-            text-align: center;
-            background: linear-gradient(90deg, #2a2ca1, #a13c15);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-family: "Segoe UI", sans-serif;
-        '>
-            Hello, {name}, ready to explore ideas? ⚡
-        </h3>
-    """, unsafe_allow_html=True)
 
 # Theme toggle function
 def toggle_theme():
