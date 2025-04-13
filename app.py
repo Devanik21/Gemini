@@ -12,7 +12,7 @@ import pandas as pd
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
 # Mode selection
-app_mode = st.radio("Choose Mode:", ["Chat", "File Upload"])
+app_mode = st.radio("Choose Mode:", ["Chat", "File Upload(Beta)"])
 
 if app_mode == "Chat":
     # Gradient-styled title using HTML
