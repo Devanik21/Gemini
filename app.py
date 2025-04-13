@@ -11,6 +11,38 @@ import streamlit as st
 
 # Page config
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
+import streamlit as st
+
+# Page config
+st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
+
+# Gradient-styled title using HTML
+gradient_title = """
+<style>
+@keyframes gradient {
+  0% {background-position: 0%;}
+  100% {background-position: 100%;}
+}
+.animated-gradient {
+  font-size: 64px;
+  font-weight: bold;
+  text-align: center;
+  background: linear-gradient(90deg, #4f46e5, #ec4899, #4f46e5);
+  background-size: 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient 3s infinite linear;
+  font-family: "Segoe UI", sans-serif;
+}
+</style>
+
+<h1 class='animated-gradient'> Gemini</h1>
+"""
+st.markdown(gradient_title, unsafe_allow_html=True)
+
+
+st.markdown(gradient_title, unsafe_allow_html=True)
+
 
 # Blurry Gradient Background Style
 # Add this after st.set_page_config(...)
