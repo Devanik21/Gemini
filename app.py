@@ -7,11 +7,7 @@ import time
 from datetime import datetime
 
 # Page settings
-import streamlit as st
 
-# Page config
-st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
-import streamlit as st
 
 # Page config
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
