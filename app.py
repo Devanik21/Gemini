@@ -114,8 +114,29 @@ with st.sidebar:
     st.markdown("---")
     chat_mode = st.selectbox(
         "🧠 Select Chat Mode",
-        ["Normal", "Deep Research", "Creative", "Explain Like I'm 5", "Code Helper", 
-         "Debate Mode", "Translation Helper", "Summarizer"]
+            [
+        "Normal",
+        "Deep Research",
+        "Creative",
+        "Explain Like I'm 5",
+        "Code Helper",
+        "Debate Mode",
+        "Translation Helper",
+        "Summarizer",
+        "Emotional Support",           # Friendly, comforting responses
+        "Idea Generator",              # Brainstorming new ideas
+        "Tech News Brief",             # Explains current tech news
+        "Quiz Me!",                    # Asks questions based on a topic
+        "Interview Coach",            # Gives mock interview questions & feedback
+        "Grammar & Style Fixer",      # Proofreads and improves writing
+        "Homework Buddy",             # Helps with assignments step by step
+        "Productivity Coach",         # Time management, focus tips
+        "Philosopher Mode",           # Deep, reflective answers
+        "Roast Me (Light Humor)",     # Playfully sarcastic or teasing replies
+        "Storyteller",                # Makes up short stories or fables
+        "Fitness & Diet Guide",       # Health advice & planning
+        "Career Advisor",             # Helps with resumes, career paths
+    ]
     )
 
     st.markdown("---")
@@ -333,8 +354,35 @@ Summarize the following text in three different ways:
 Text to summarize:
 \"\"\"{user_prompt}\"\"\"
 """
+        elif chat_mode == "Emotional Support":
+            system_prompt = f"You are a kind and empathetic listener. Offer supportive and comforting responses to: {user_prompt}"
+        elif chat_mode == "Idea Generator":
+            system_prompt = f"You are a brainstorming engine. Generate fresh, unique, and useful ideas related to: {user_prompt}"
+        elif chat_mode == "Tech News Brief":
+            system_prompt = f"You are a tech journalist. Summarize and explain the latest technology news about: {user_prompt}"
+        elif chat_mode == "Quiz Me!":
+            system_prompt = f"You are a quizmaster. Ask the user 3-5 interactive quiz questions based on: {user_prompt}"
+        elif chat_mode == "Interview Coach":
+            system_prompt = f"You are an expert interview coach. Ask mock questions or provide feedback related to: {user_prompt}"
+        elif chat_mode == "Grammar & Style Fixer":
+            system_prompt = f"You are an English editor. Improve grammar, sentence structure, and writing style of the following text: {user_prompt}"
+        elif chat_mode == "Homework Buddy":
+            system_prompt = f"You are a helpful tutor. Break down and explain each step to solve: {user_prompt}"
+        elif chat_mode == "Productivity Coach":
+            system_prompt = f"You are a productivity guru. Give practical advice, time management tips, and focus strategies for: {user_prompt}"
+        elif chat_mode == "Philosopher Mode":
+            system_prompt = f"You are a wise philosopher. Reflect deeply and insightfully about: {user_prompt}"
+        elif chat_mode == "Roast Me (Light Humor)":
+            system_prompt = f"You are a stand-up comedian. Lightly roast the user in a humorous way based on: {user_prompt}"
+        elif chat_mode == "Storyteller":
+            system_prompt = f"You are a master storyteller. Create an original and imaginative short story inspired by: {user_prompt}"
+        elif chat_mode == "Fitness & Diet Guide":
+            system_prompt = f"You are a certified fitness coach and nutritionist. Provide customized fitness and diet advice for: {user_prompt}"
+        elif chat_mode == "Career Advisor":
+            system_prompt = f"You are a career development expert. Give tailored advice regarding jobs, resume, or growth about: {user_prompt}"
         else:
             system_prompt = user_prompt
+
 
         # Show a spinner while loading
         with st.spinner("Gemini is thinking..."):
