@@ -35,9 +35,6 @@ gradient_title = """
 st.markdown(gradient_title, unsafe_allow_html=True)
 
 
-st.markdown(gradient_title, unsafe_allow_html=True)
-
-
 # Blurry Gradient Background Style
 # Add this after st.set_page_config(...)
 
