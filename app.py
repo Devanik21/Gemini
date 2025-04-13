@@ -14,21 +14,30 @@ st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
 # Gradient-styled title using HTML
 gradient_title = """
-<h1 style='
-    font-size: 64px;
-    font-weight: bold;
-    text-align: center;
-    background: linear-gradient(90deg, #4f46e5, #ec4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-family: "Segoe UI", sans-serif;
-    margin-top: 0;
-'>
-     Gemini
-</h1>
-"""
+<style>
+@keyframes gradient {
+  0% {background-position: 0%;}
+  100% {background-position: 100%;}
+}
+.animated-gradient {
+  font-size: 64px;
+  font-weight: bold;
+  text-align: center;
+  background: linear-gradient(90deg, #4f46e5, #ec4899, #4f46e5);
+  background-size: 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient 3s infinite linear;
+  font-family: "Segoe UI", sans-serif;
+}
+</style>
 
+<h1 class='animated-gradient'> Gemini</h1>
+"""
 st.markdown(gradient_title, unsafe_allow_html=True)
+
+
+
 
 # Initialize session data for settings and themes
 if "settings" not in st.session_state:
