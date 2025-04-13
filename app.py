@@ -24,7 +24,7 @@ gradient_title = """
     font-family: "Segoe UI", sans-serif;
     margin-top: 0;
 '>
-    💎 Gemini
+     Gemini
 </h1>
 """
 
@@ -50,8 +50,21 @@ if "conversation_history" not in st.session_state:
 
 # Name input
 name = st.text_input("Please enter your name", value=" ")
+
 if name.strip():
-    st.markdown(f"### Hello {name}, ready to explore ideas? ⚡")
+    st.markdown(f"""
+        <h3 style='
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(90deg, #6366f1, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: "Segoe UI", sans-serif;
+        '>
+            Hello, {name}, ready to explore ideas? ⚡
+        </h3>
+    """, unsafe_allow_html=True)
 
 # Theme toggle function
 def toggle_theme():
