@@ -57,7 +57,7 @@ if name.strip():
             font-size: 36px;
             font-weight: bold;
             text-align: center;
-            background: linear-gradient(90deg, #6366f1, #ec4899);
+            background: linear-gradient(90deg, #2a2ca1, #a13c15);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-family: "Segoe UI", sans-serif;
