@@ -14,39 +14,6 @@ st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
 # Blurry Gradient Background Style
 # Add this after st.set_page_config(...)
-st.markdown("""
-    <style>
-    /* Main App Container */
-    .stApp {
-        background: linear-gradient(135deg, #3a0ca3, #7209b7, #f72585);
-        background-size: 400% 400%;
-        animation: moveGradient 20s ease infinite;
-        filter: blur(0px);
-        overflow: hidden;
-    }
-
-    @keyframes moveGradient {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    /* Optional frosted glass effect on blocks */
-    .block-container {
-        background-color: rgba(0, 0, 0, 0.2);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 16px;
-        padding: 2rem;
-        color: white;
-    }
-
-    /* Hide Streamlit's default white box */
-    .css-18ni7ap, .css-1dp5vir {
-        background: transparent !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 
 name = st.text_input("Please enter your name", value=" ")
