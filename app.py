@@ -12,6 +12,41 @@ import streamlit as st
 # Page config
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
 
+# Blurry Gradient Background Style
+st.markdown("""
+    <style>
+    body {
+        background: linear-gradient(120deg, #4f46e5, #ec4899, #f97316);
+        background-size: 300% 300%;
+        animation: gradientMove 12s ease infinite;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+
+    @keyframes gradientMove {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
+
+    .stApp {
+        background: transparent !important;
+    }
+
+    .css-18e3th9 {
+        background: transparent !important;
+    }
+
+    .block-container {
+        backdrop-filter: blur(4px);
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 1.5rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
 # Gradient-styled title using HTML
 gradient_title = """
 <style>
