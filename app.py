@@ -338,23 +338,7 @@ if export_json:
         st.warning("No conversation available to export yet.")
 
 # Add feedback mechanism
-st.markdown("---")
-st.subheader("📝 Feedback")
-with st.expander("Rate your experience"):
-    st.write("How helpful was the assistant?")
-    rating = st.slider("Rating", 1, 5, 3)
-    feedback_text = st.text_area("Additional comments:")
-    if st.button("Submit Feedback"):
-        # Here you would normally send this to a database
-        st.success("Thank you for your feedback!")
-        # Save feedback to session state for demonstration
-        if "feedback_history" not in st.session_state:
-            st.session_state.feedback_history = []
-        st.session_state.feedback_history.append({
-            "rating": rating,
-            "comments": feedback_text,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
+
 
 # Display system status in footer
 st.markdown("---")
