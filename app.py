@@ -499,7 +499,7 @@ else:  # File Upload mode
     # Initialize chat for file mode if not exists
     if "file_chat" not in st.session_state and "api_key" in st.session_state and st.session_state.api_key:
         st.session_state.file_chat = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
+            model_name="gemini-2.5-flash-preview-04-17",
             generation_config={
                 "max_output_tokens": 8192,
                 "temperature": 0.7,
