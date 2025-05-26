@@ -1,41 +1,75 @@
 import streamlit as st
 import google.generativeai as genai
+from fpdf import FPDF
 import os
+import json
 import time
 from datetime import datetime
+import tempfile
 import pandas as pd
-
-# Custom modules
-from config import (
-    DEFAULT_MODEL_NAME, FILE_ANALYSIS_MODEL_NAME, DEFAULT_GENERATION_CONFIG,
-    SUPPORTED_TRANSLATION_LANGUAGES, SUPPORTED_FILE_UPLOAD_TYPES,
-    CHAT_MODES, FILE_CHAT_MODES, UPLOAD_DIR
-)
-from styles import (
-    get_gradient_title_style, get_animated_greeting_style,
-    get_theme_styling, get_file_upload_title_style, get_footer_style
-)
-from prompts import get_chat_mode_system_prompt, get_file_chat_system_prompt
-from file_utils import export_to_pdf, export_to_json
 
 # Page settings
 st.set_page_config(page_title="Gemini", layout="wide", page_icon="💎")
-
-# --- Helper Functions ---
-def initialize_model(model_name, generation_config, history=None):
-    if history is None:
-        history = []
-    return genai.GenerativeModel(model_name=model_name, generation_config=generation_config).start_chat(history=history)
 
 # Mode selection
 app_mode = st.radio("Choose Mode:", ["Chat", "File Upload(Beta)"])
 
 if app_mode == "Chat":
-    st.markdown(get_gradient_title_style(), unsafe_allow_html=True)
+    # Gradient-styled title using HTML
+    gradient_title = """
+    <style>
+    @keyframes gradient {
+      0% {background-position: 0%;}
+      100% {background-position: 100%;}
+    }
+    .animated-gradient {
+      font-size: 64px;
+      font-weight: bold;
+      text-align: center;
+      background: linear-gradient(90deg, #4f46e5, #ec4899, #4f46e5);
+      background-size: 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradient 3s infinite linear;
+      font-family: "Segoe UI", sans-serif;
+    }
+    </style>
+
+    <h1 class='animated-gradient'> Gemini</h1>
+    """
+    st.markdown(gradient_title, unsafe_allow_html=True)
+
+
+    # Blurry Gradient Background Style
+    # Add this after st.set_page_config(...)
+
 
     name = st.text_input("Please enter your name", value=" ")
+
     if name.strip():
-        st.markdown(get_animated_greeting_style(name.strip()), unsafe_allow_html=True)
+        st.markdown(f"""
+            <style>
+            @keyframes gradientShift {{
+                0% {{ background-position: 0%; }}
+                100% {{ background-position: 100%; }}
+            }}
+            .animated-greeting {{
+                font-size: 36px;
+                font-weight: bold;
+                text-align: center;
+                background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+                background-size: 300%;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                animation: gradientShift 4s linear infinite;
+                font-family: "Segoe UI", sans-serif;
+                margin-top: 10px;
+            }}
+            </style>
+
+            <h3 class='animated-greeting'>Hello, {name}, ready to explore ideas? ⚡</h3>
+        """, unsafe_allow_html=True)
+
 
     # Initialize session data for settings and themes
     if "settings" not in st.session_state:
@@ -43,7 +77,7 @@ if app_mode == "Chat":
             "temperature": 0.7,
             "top_k": 40,
             "top_p": 0.95,
-            "max_tokens": DEFAULT_GENERATION_CONFIG["max_output_tokens"]
+            "max_tokens": 8192
         }
 
     if "theme" not in st.session_state:
@@ -55,47 +89,60 @@ if app_mode == "Chat":
     if "conversation_history" not in st.session_state:
         st.session_state.conversation_history = {}
 
-    if "api_key" not in st.session_state:
-        st.session_state.api_key = None
+    # Name input
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Apply theme initially
-    st.markdown(get_theme_styling(st.session_state.theme), unsafe_allow_html=True)
 
     # Theme toggle function
     def toggle_theme():
         st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
-        st.markdown(get_theme_styling(st.session_state.theme), unsafe_allow_html=True)
-        st.rerun() # Rerun to apply style changes immediately
+        # Apply theme changes
+        if st.session_state.theme == "dark":
+            st.markdown("""
+            <style>
+            .main {background-color: #0e1117; color: #ffffff;}
+            .sidebar .sidebar-content {background-color: #262730; color: #ffffff;}
+            </style>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <style>
+            .main {background-color: #ffffff; color: #31333F;}
+            .sidebar .sidebar-content {background-color: #f0f2f6; color: #31333F;}
+            </style>
+            """, unsafe_allow_html=True)
 
     # Sidebar - API, Chat Mode, Clear, Settings
     with st.sidebar:
         st.header("🔐 Gemini API Settings")
-        # Use a single API key input, store in session state
-        current_api_key = st.text_input("Enter your Gemini API key:", type="password", value=st.session_state.api_key or "")
-        if current_api_key != st.session_state.api_key:
-            st.session_state.api_key = current_api_key
-            if current_api_key:
-                try:
-                    genai.configure(api_key=current_api_key)
-                    st.success("API key configured!", icon="✅")
-                    # Re-initialize chat if API key changes and is valid
-                    if "chat" in st.session_state: del st.session_state.chat
-                except Exception as e:
-                    st.error(f"Invalid API Key: {e}")
-                    st.session_state.api_key = None # Reset if invalid
-            else:
-                st.warning("API key removed.", icon="ℹ️")
+        api_key = st.text_input("Enter your Gemini API key:", type="password")
 
         st.markdown("---")
         chat_mode = st.selectbox(
             "🧠 Select Chat Mode",
-            CHAT_MODES,
-            index=CHAT_MODES.index(st.session_state.get("chat_mode", "Normal")) # Persist selection
+                [
+            "Normal",
+            "Deep Research",
+            "Creative",
+            "Explain Like I'm 5",
+            "Code Helper",
+            "Debate Mode",
+            "Translation Helper",
+            "Summarizer",
+            "Emotional Support",           # Friendly, comforting responses
+            "Idea Generator",              # Brainstorming new ideas
+            "Tech News Brief",             # Explains current tech news
+            "Quiz Me!",                    # Asks questions based on a topic
+            "Interview Coach",            # Gives mock interview questions & feedback
+            "Grammar & Style Fixer",      # Proofreads and improves writing
+            "Homework Buddy",             # Helps with assignments step by step
+            "Productivity Coach",         # Time management, focus tips
+            "Philosopher Mode",           # Deep, reflective answers
+            "Roast Me (Light Humor)",     # Playfully sarcastic or teasing replies
+            "Storyteller",                # Makes up short stories or fables
+            "Fitness & Diet Guide",       # Health advice & planning
+            "Career Advisor",             # Helps with resumes, career paths
+        ]
         )
-        st.session_state.chat_mode = chat_mode # Store selection
 
         st.markdown("---")
         # New feature: Save/Load conversation
@@ -106,7 +153,7 @@ if app_mode == "Chat":
         with col1:
             if st.button("💾 Save Chat"):
                 if save_name and len(st.session_state.messages) > 0:
-                    st.session_state.conversation_history[save_name.strip()] = {
+                    st.session_state.conversation_history[save_name] = {
                         "messages": st.session_state.messages.copy(),
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
                     }
@@ -119,7 +166,6 @@ if app_mode == "Chat":
                 st.session_state.messages = []
                 if "chat" in st.session_state:
                     del st.session_state.chat
-                # No need to re-initialize chat here, it will be done before sending message if needed
                 st.success("Chat history cleared!")
 
         # Load saved conversation
@@ -133,8 +179,6 @@ if app_mode == "Chat":
             if st.button("📂 Load Selected Chat"):
                 if selected_chat:
                     st.session_state.messages = st.session_state.conversation_history[selected_chat]["messages"].copy()
-                    if "chat" in st.session_state: del st.session_state.chat # Reset chat to use new history
-                    # Chat will be re-initialized with new history on next message
                     st.success(f"Loaded conversation: {selected_chat}")
                     st.rerun()
 
@@ -170,22 +214,27 @@ if app_mode == "Chat":
                 value=st.session_state.settings["max_tokens"], step=256,
                 help="Maximum length of generated text"
             )
-
-        if not st.session_state.api_key:
+        
+        if api_key:
+            genai.configure(api_key=api_key)
+            st.success("API key set successfully!", icon="✅")
+        else:
             st.warning("Enter Gemini API key to begin", icon="⚠️")
 
-    # Initialize chat model if API key is set and chat object doesn't exist or history is empty
-    if st.session_state.api_key and ("chat" not in st.session_state or not st.session_state.chat.history):
-        try:
-            current_gen_config = {
+    # Initialize session
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if "chat" not in st.session_state and api_key:
+        st.session_state.chat = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            generation_config={
                 "max_output_tokens": st.session_state.settings["max_tokens"],
                 "temperature": st.session_state.settings["temperature"],
                 "top_p": st.session_state.settings["top_p"],
-                "top_k": st.session_state.settings["top_k"] # Ensure top_k is part of settings if used
+                "top_k": st.session_state.settings["top_k"]
             }
-            st.session_state.chat = initialize_model(DEFAULT_MODEL_NAME, current_gen_config, history=st.session_state.messages)
-        except Exception as e:
-            st.error(f"Failed to initialize chat model: {e}")
+        ).start_chat(history=[])
 
     # Show chat history
     for i, msg in enumerate(st.session_state.messages):
@@ -218,29 +267,52 @@ if app_mode == "Chat":
                     st.rerun()
                 st.markdown("---")
 
+    # PDF Export Function
+    def export_to_pdf(text, filename="gemini_response.pdf"):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_font("Arial", size=12)
+
+        for line in text.split("\n"):
+            pdf.multi_cell(0, 10, line)
+
+        pdf.output(filename)
+        return filename
+
+    # Export to JSON Function
+    def export_to_json(chat_history, filename="gemini_chat_export.json"):
+        export_data = {
+            "messages": chat_history,
+            "export_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "chat_mode": chat_mode
+        }
+        
+        with open(filename, "w") as f:
+            json.dump(export_data, f, indent=4)
+        
+        return filename
+
     # Chat input
-    if st.session_state.api_key:
+    if api_key:
         # Add a typing effect toggle
         typing_effect = st.checkbox("Enable typing effect for responses", value=False)
-        target_language = None # Initialize
-
+        
         # Add language selection for Translation Mode
         if chat_mode == "Translation Helper":
             target_language = st.selectbox(
                 "Translate to:", 
-                SUPPORTED_TRANSLATION_LANGUAGES
+                ["Spanish", "French", "German", "Italian", "Portuguese", "Russian", "Japanese", "Chinese", "Arabic", "Hindi"]
             )
         
         # Add a file selection option to use with chat if files are uploaded
-        selected_chat_file_info = None
         if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
             st.markdown("### Use Uploaded Files")
             file_options = ["None"] + [f"{file['name']}" for file in st.session_state.uploaded_files]
             selected_chat_file = st.selectbox("Select a file to discuss:", file_options)
-            if selected_chat_file_name != "None":
-                selected_chat_file_info = next((f for f in st.session_state.uploaded_files if f['name'] == selected_chat_file_name), None)
-                if selected_chat_file_info:
-                    st.info(f"Context from '{selected_chat_file_info['name']}' can be used by the AI.")
+            
+            if selected_chat_file != "None":
+                st.info(f"You can ask questions about '{selected_chat_file}' in your chat.")
         
         user_prompt = st.chat_input("Ask anything 💬")
 
@@ -248,58 +320,110 @@ if app_mode == "Chat":
             st.chat_message("user").markdown(user_prompt)
             st.session_state.messages.append({"role": "user", "content": user_prompt})
 
-            system_prompt = get_chat_mode_system_prompt(user_prompt, chat_mode, target_language, selected_chat_file_info)
+            # Prepare system prompt for different modes
+            if chat_mode == "Deep Research":
+                system_prompt = f"""
+    You are a high-level research assistant writing in-depth academic responses. 
+    Structure the output as a formal article (~8000 tokens) with:
+    1. Executive Summary
+    2. Introduction
+    3. History & Evolution
+    4. Concepts & Frameworks
+    5. Current State
+    6. Challenges
+    7. Applications
+    8. Comparisons
+    9. Future Outlook
+    10. Conclusion
+    11. References (Optional)
+
+    Query:
+    \"\"\"{user_prompt}\"\"\"
+    """
+            elif chat_mode == "Creative":
+                system_prompt = f"You are a wildly creative storyteller and ideator. Think like a novelist or futurist. Respond creatively to: {user_prompt}"
+            elif chat_mode == "Explain Like I'm 5":
+                system_prompt = f"Explain this like I'm 5 years old: {user_prompt}"
+            elif chat_mode == "Code Helper":
+                system_prompt = f"You are a coding assistant. Explain, debug, or generate code for this prompt: {user_prompt}"
+            elif chat_mode == "Debate Mode":
+                system_prompt = f"""
+    You are a balanced debate assistant. For the topic provided:
+    1. Present a strong case for the position (Pro)
+    2. Present a strong case against the position (Con)
+    3. Analyze the strongest points from both sides
+    4. Provide a balanced conclusion
+
+    Topic: {user_prompt}
+    """
+            elif chat_mode == "Translation Helper":
+                system_prompt = f"Translate the following text to {target_language}. Provide both the translation and any cultural notes or context that might be helpful: {user_prompt}"
+            elif chat_mode == "Summarizer":
+                system_prompt = f"""
+    Summarize the following text in three different ways:
+    1. Executive summary (2-3 sentences)
+    2. Bullet point summary (5-7 key points)
+    3. Detailed summary (3-4 paragraphs)
+
+    Text to summarize:
+    \"\"\"{user_prompt}\"\"\"
+    """
+            elif chat_mode == "Emotional Support":
+                system_prompt = f"You are a kind and empathetic listener. Offer supportive and comforting responses to: {user_prompt}"
+            elif chat_mode == "Idea Generator":
+                system_prompt = f"You are a brainstorming engine. Generate fresh, unique, and useful ideas related to: {user_prompt}"
+            elif chat_mode == "Tech News Brief":
+                system_prompt = f"You are a tech journalist. Summarize and explain the latest technology news about: {user_prompt}"
+            elif chat_mode == "Quiz Me!":
+                system_prompt = f"You are a quizmaster. Ask the user 3-5 interactive quiz questions based on: {user_prompt}"
+            elif chat_mode == "Interview Coach":
+                system_prompt = f"You are an expert interview coach. Ask mock questions or provide feedback related to: {user_prompt}"
+            elif chat_mode == "Grammar & Style Fixer":
+                system_prompt = f"You are an English editor. Improve grammar, sentence structure, and writing style of the following text: {user_prompt}"
+            elif chat_mode == "Homework Buddy":
+                system_prompt = f"You are a helpful tutor. Break down and explain each step to solve: {user_prompt}"
+            elif chat_mode == "Productivity Coach":
+                system_prompt = f"You are a productivity guru. Give practical advice, time management tips, and focus strategies for: {user_prompt}"
+            elif chat_mode == "Philosopher Mode":
+                system_prompt = f"You are a wise philosopher. Reflect deeply and insightfully about: {user_prompt}"
+            elif chat_mode == "Roast Me (Light Humor)":
+                system_prompt = f"You are a stand-up comedian. Lightly roast the user in a humorous way based on: {user_prompt}"
+            elif chat_mode == "Storyteller":
+                system_prompt = f"You are a master storyteller. Create an original and imaginative short story inspired by: {user_prompt}"
+            elif chat_mode == "Fitness & Diet Guide":
+                system_prompt = f"You are a certified fitness coach and nutritionist. Provide customized fitness and diet advice for: {user_prompt}"
+            elif chat_mode == "Career Advisor":
+                system_prompt = f"You are a career development expert. Give tailored advice regarding jobs, resume, or growth about: {user_prompt}"
+            else:
+                system_prompt = user_prompt
+
 
             # Show a spinner while loading
             with st.spinner("Gemini is thinking..."):
-                try:
-                    # Ensure chat is initialized with current history and settings
-                    if "chat" not in st.session_state or not st.session_state.chat.history:
-                         current_gen_config = {
-                            "max_output_tokens": st.session_state.settings["max_tokens"],
-                            "temperature": st.session_state.settings["temperature"],
-                            "top_p": st.session_state.settings["top_p"],
-                            "top_k": st.session_state.settings["top_k"]
-                        }
-                         st.session_state.chat = initialize_model(DEFAULT_MODEL_NAME, current_gen_config, history=st.session_state.messages)
-                    
-                    # Update model generation config if settings changed
-                    st.session_state.chat.model.generation_config = genai.types.GenerationConfig(
-                        max_output_tokens=st.session_state.settings["max_tokens"],
-                        temperature=st.session_state.settings["temperature"],
-                        top_p=st.session_state.settings["top_p"],
-                        top_k=st.session_state.settings["top_k"]
-                    )
-
+                # Update model parameters before sending
+                if "chat" in st.session_state:
+                    # Get response from Gemini
                     response = st.session_state.chat.send_message(system_prompt)
                     reply = response.text
 
-                except genai.types.generation_types.BlockedPromptException as e:
-                    st.error(f"Your prompt was blocked. Reason: {e}")
-                    reply = "My apologies, I cannot respond to that prompt as it was blocked."
-                except google.api_core.exceptions.PermissionDenied as e:
-                    st.error(f"API Key Error: Permission denied. Please check your API key. Details: {e}")
-                    reply = "Error: API permission issue."
-                except Exception as e:
-                    st.error(f"An unexpected error occurred: {e}")
-                    reply = f"Sorry, an error occurred: {str(e)}"
+                    # Typing effect simulation
+                    if typing_effect:
+                        with st.chat_message("assistant"):
+                            message_placeholder = st.empty()
+                            full_response = ""
+                            # Simulate typing with chunks of text
+                            for chunk in reply.split():
+                                full_response += chunk + " "
+                                message_placeholder.markdown(full_response + "▌")
+                                time.sleep(0.05)  # Adjust typing speed
+                            message_placeholder.markdown(reply)
+                    else:
+                        st.chat_message("assistant").markdown(reply)
 
-                # Typing effect simulation
-                if typing_effect and reply:
-                    with st.chat_message("assistant"):
-                        message_placeholder = st.empty()
-                        full_response = ""
-                        for chunk in reply.split(): # Simple chunking by word
-                            full_response += chunk + " "
-                            message_placeholder.markdown(full_response + "▌")
-                            time.sleep(0.03) # Adjust typing speed
-                        message_placeholder.markdown(reply)
-                elif reply:
-                    st.chat_message("assistant").markdown(reply)
-
-                if reply:
                     st.session_state.messages.append({"role": "assistant", "content": reply})
-                    st.session_state.last_reply = reply # Save last reply for PDF export
+
+                    # Save last reply to export
+                    st.session_state.last_reply = reply
 
     # Export last response to PDF
     if export_pdf:
@@ -318,7 +442,7 @@ if app_mode == "Chat":
     # Export all conversation to JSON
     if export_json:
         if st.session_state.messages:
-            filename = export_to_json(st.session_state.messages, chat_mode=chat_mode)
+            filename = export_to_json(st.session_state.messages)
             with open(filename, "rb") as f:
                 st.download_button(
                     label="📄 Download JSON",
@@ -340,343 +464,76 @@ if app_mode == "Chat":
         st.caption(f"Temperature: {st.session_state.settings['temperature']}")
 
 else:  # File Upload mode
-    st.markdown(get_file_upload_title_style(), unsafe_allow_html=True)
+    # Create a fancy title for file upload screen
+    st.markdown("""
+    <style>
+    @keyframes gradient {
+      0% {background-position: 0%;}
+      100% {background-position: 100%;}
+    }
+    .upload-gradient {
+      font-size: 40px;
+      font-weight: bold;
+      text-align: center;
+      background: linear-gradient(90deg, #3b82f6, #10b981, #3b82f6);
+      background-size: 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: gradient 3s infinite linear;
+      font-family: "Segoe UI", sans-serif;
+      margin-bottom: 20px;
+    }
+    </style>
 
+    <h2 class='upload-gradient'>Document Upload & Analysis</h2>
+    """, unsafe_allow_html=True)
+    
     # Initialize session state for uploaded files
     if "uploaded_files" not in st.session_state:
         st.session_state.uploaded_files = []
+    
+    # Initialize session data for file chat
     if "file_messages" not in st.session_state:
         st.session_state.file_messages = []
-    if "api_key" not in st.session_state: # Ensure api_key is initialized for this mode too
-        st.session_state.api_key = None
-
-    # Apply theme initially
-    if "theme" not in st.session_state: st.session_state.theme = "light" # Default theme
-    st.markdown(get_theme_styling(st.session_state.theme), unsafe_allow_html=True)
-
-    def toggle_file_mode_theme(): # Separate theme toggle if needed, or use global
-        st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
-        st.markdown(get_theme_styling(st.session_state.theme), unsafe_allow_html=True)
-        st.rerun()
-
-    # Initialize file_chat model
-    if st.session_state.api_key and "file_chat" not in st.session_state:
-        try:
-            st.session_state.file_chat = initialize_model(
-                FILE_ANALYSIS_MODEL_NAME,
-                DEFAULT_GENERATION_CONFIG, # Use default or make specific config for file chat
-                history=st.session_state.file_messages
-            )
-        except Exception as e:
-            st.error(f"Failed to initialize file chat model: {e}")
-
+    
+    # Initialize chat for file mode if not exists
+    if "file_chat" not in st.session_state and "api_key" in st.session_state and st.session_state.api_key:
+        st.session_state.file_chat = genai.GenerativeModel(
+            model_name="gemini-2.5-flash-preview-04-17",
+            generation_config={
+                "max_output_tokens": 8192,
+                "temperature": 0.7,
+                "top_p": 0.95,
+                "top_k": 40
+            }
+        ).start_chat(history=[])
+        
     # Create upload directory if it doesn't exist
-    if not os.path.exists(UPLOAD_DIR):
-        os.makedirs(UPLOAD_DIR)
-
+    upload_dir = "uploaded_files"
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    
     # API Key field in sidebar for file mode
     with st.sidebar:
         st.header("🔐 Gemini API Settings")
-        # Use the same API key logic as Chat mode for consistency
-        current_api_key_file = st.text_input("Enter your Gemini API key:", type="password", value=st.session_state.api_key or "", key="file_api_key_input")
-        if current_api_key_file != st.session_state.api_key:
-            st.session_state.api_key = current_api_key_file
-            if current_api_key_file:
-                try:
-                    genai.configure(api_key=current_api_key_file)
-                    st.success("API key configured!", icon="✅")
-                    if "file_chat" in st.session_state: del st.session_state.file_chat # Re-init on key change
-                except Exception as e:
-                    st.error(f"Invalid API Key: {e}")
-                    st.session_state.api_key = None
-            else:
-                st.warning("API key removed.", icon="ℹ️")
-
-        if not st.session_state.api_key:
-            st.warning("Enter Gemini API key to begin", icon="⚠️")
-
-        # Chat mode selection for file chat
-        st.markdown("---")
-        file_chat_mode = st.selectbox(
-            "🧠 Select Chat Mode for Files",
-            FILE_CHAT_MODES,
-            index=FILE_CHAT_MODES.index(st.session_state.get("file_chat_mode", "Document Analysis"))
-        )
-        st.session_state.file_chat_mode = file_chat_mode
-
-        # Clear file chat
-        if st.button("🧹 Clear File Chat"):
-            st.session_state.file_messages = []
-            if "file_chat" in st.session_state:
-                del st.session_state.file_chat
-            st.success("File chat history cleared!")
-            st.rerun() # Rerun to clear display
-
-        # Theme toggle for file mode
-        st.markdown("---")
-        st.header("🎨 Appearance")
-        if st.button("Toggle Dark/Light Mode", key="theme_toggle_file_mode"):
-            toggle_file_mode_theme()
-
-    # Two columns: File Upload and Chat
-    col1, col2 = st.columns([1, 1]) # Adjusted column ratio for better balance
-
-    with col1:
-        st.subheader("📁 Upload Documents")
-        st.markdown(f"Supported formats: {', '.join(SUPPORTED_FILE_UPLOAD_TYPES)}")
-
-        uploaded_files_widget = st.file_uploader( # Renamed variable to avoid conflict
-            "Choose files to upload:",
-            accept_multiple_files=True,
-            type=SUPPORTED_FILE_UPLOAD_TYPES
-        )
-
-        if uploaded_files_widget:
-            st.success(f"{len(uploaded_files_widget)} file(s) selected for upload queue.")
-
-            if st.button("Confirm Upload Files"):
-                processed_count = 0
-                for uploaded_file_item in uploaded_files_widget:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    # Sanitize filename slightly for safety, though Streamlit usually handles this
-                    safe_original_name = "".join(c if c.isalnum() or c in ['.', '_', '-'] else '_' for c in uploaded_file_item.name)
-                    filename = f"{timestamp}_{safe_original_name}"
-                    file_path = os.path.join(UPLOAD_DIR, filename)
-
-                    try:
-                        with open(file_path, "wb") as f:
-                            f.write(uploaded_file_item.getbuffer())
-
-                        file_info = {
-                            "name": uploaded_file_item.name, # Store original name for display
-                            "path": file_path,
-                            "type": uploaded_file_item.type,
-                            "size": uploaded_file_item.size,
-                            "timestamp": timestamp # Use the one from filename for consistency
-                        }
-                        # Avoid duplicates if re-uploading the same batch without clearing
-                        if not any(f['path'] == file_path for f in st.session_state.uploaded_files):
-                            st.session_state.uploaded_files.append(file_info)
-                        processed_count +=1
-                    except Exception as e:
-                        st.error(f"Error saving {uploaded_file_item.name}: {e}")
-                if processed_count > 0:
-                    st.success(f"Successfully processed {processed_count} files!")
-                    st.rerun() # Rerun to update file list display
-
-        # Display uploaded files
-        if st.session_state.uploaded_files:
-            st.markdown("### Your Uploaded Documents")
-            files_to_remove = [] # For safe removal while iterating
-
-            for i, file_info in enumerate(st.session_state.uploaded_files):
-                with st.container(): # Use container for better layout of buttons
-                    c1, c2, c3 = st.columns([4,1,1])
-                    with c1:
-                        st.write(f"**{file_info['name']}**")
-                        st.caption(f"Size: {file_info['size']/(1024*1024):.2f} MB | Uploaded: {file_info['timestamp']}")
-                    
-                    viewable_types = ["txt", "csv", "json", "md", "html"]
-                    file_ext = file_info['name'].split('.')[-1].lower()
-                    if file_ext in viewable_types:
-                        with c2:
-                            if st.button("View", key=f"view_{file_info['path']}"): # Use path for unique key
-                                try:
-                                    with open(file_info['path'], 'r', encoding='utf-8', errors='replace') as f_view:
-                                        content = f_view.read()
-                                    st.text_area(f"Content: {file_info['name']}", value=content, height=300, key=f"view_area_{file_info['path']}")
-                                except Exception as e:
-                                    st.error(f"Could not read file {file_info['name']}: {e}")
-                    with c3:
-                        if st.button("Delete", key=f"delete_{file_info['path']}"):
-                            files_to_remove.append(file_info)
-                st.markdown("---")
-
-            if files_to_remove:
-                for file_to_remove in files_to_remove:
-                    if os.path.exists(file_to_remove['path']):
-                        try:
-                            os.remove(file_to_remove['path'])
-                        except Exception as e:
-                            st.error(f"Error deleting file from disk {file_to_remove['name']}: {e}")
-                    st.session_state.uploaded_files.remove(file_to_remove)
-                st.success("Selected files deleted.")
-                st.rerun()
-
-            if st.button("Clear All Uploaded Files"):
-                for file_info_clear in st.session_state.uploaded_files:
-                    if os.path.exists(file_info_clear['path']):
-                        try:
-                            os.remove(file_info_clear['path'])
-                        except Exception as e:
-                             st.error(f"Error deleting file from disk {file_info_clear['name']}: {e}")
-                st.session_state.uploaded_files = []
-                st.success("All uploaded files cleared!")
-                st.rerun()
-
-        # Add basic file analysis options
-        if st.session_state.uploaded_files:
-            st.markdown("### Quick Analysis Tools")
-            if not st.session_state.uploaded_files: # Should not happen if we are in this block, but defensive
-                 st.info("No files uploaded to analyze.")
-            else:
-                file_options_analysis = [f"{file['name']}" for file in st.session_state.uploaded_files]
-                # Ensure selected_file_analysis is valid or default to first if list changes
-                current_selected_analysis = st.session_state.get("selected_file_for_analysis")
-                if current_selected_analysis not in file_options_analysis and file_options_analysis:
-                    st.session_state.selected_file_for_analysis = file_options_analysis[0]
-                elif not file_options_analysis: # No files left
-                     st.session_state.selected_file_for_analysis = None
-
-                selected_file_name_analysis = st.selectbox(
-                    "Select a file to analyze:",
-                    file_options_analysis,
-                    index=file_options_analysis.index(st.session_state.selected_file_for_analysis) if st.session_state.selected_file_for_analysis and st.session_state.selected_file_for_analysis in file_options_analysis else 0,
-                    key="quick_analysis_selector_widget"
-                )
-                st.session_state.selected_file_for_analysis = selected_file_name_analysis
-
-
-                if selected_file_name_analysis:
-                    selected_file_info_analysis = next((f for f in st.session_state.uploaded_files if f['name'] == selected_file_name_analysis), None)
-                    if selected_file_info_analysis:
-                        file_ext_analysis = selected_file_info_analysis['name'].split('.')[-1].lower()
-
-                        if file_ext_analysis == 'csv':
-                            st.markdown("#### CSV Analysis")
-                            if st.button("Analyze CSV"):
-                                try:
-                                    df = pd.read_csv(selected_file_info_analysis['path'])
-                                    st.write("##### Preview (Top 5 rows)")
-                                    st.dataframe(df.head())
-                                    st.write("##### Summary Statistics")
-                                    st.dataframe(df.describe(include='all')) # include='all' for mixed types
-                                except Exception as e:
-                                    st.error(f"Error analyzing CSV {selected_file_info_analysis['name']}: {e}")
-
-                        elif file_ext_analysis in ['xlsx', 'xls']:
-                            st.markdown("#### Excel Analysis")
-                            if st.button("Analyze Excel"):
-                                try:
-                                    xls = pd.ExcelFile(selected_file_info_analysis['path'])
-                                    if not xls.sheet_names:
-                                        st.warning("Excel file contains no sheets.")
-                                    else:
-                                        sheet_name = st.selectbox("Select sheet:", xls.sheet_names, key=f"excel_sheet_{selected_file_info_analysis['path']}")
-                                        df = pd.read_excel(selected_file_info_analysis['path'], sheet_name=sheet_name)
-                                        st.write(f"##### Preview (Top 5 rows from sheet: {sheet_name})")
-                                        st.dataframe(df.head())
-                                except Exception as e:
-                                    st.error(f"Error analyzing Excel file {selected_file_info_analysis['name']}: {e}")
-
-                        elif file_ext_analysis in ['txt', 'md']:
-                            st.markdown("#### Text Analysis")
-                            if st.button("Analyze Text"):
-                                try:
-                                    with open(selected_file_info_analysis['path'], 'r', encoding='utf-8', errors='replace') as f_text:
-                                        content = f_text.read()
-                                    st.write(f"Character count: {len(content):,}")
-                                    st.write(f"Word count: {len(content.split()):,}")
-                                    st.write(f"Line count: {len(content.splitlines()):,}")
-                                except Exception as e:
-                                    st.error(f"Error analyzing text file {selected_file_info_analysis['name']}: {e}")
-                    else:
-                        st.warning("Selected file for analysis not found in session. Please re-select.")
-
-    with col2:
-        st.subheader("💬 Chat with Your Documents")
-
-        if st.session_state.uploaded_files:
-            file_options_chat = [f"{file['name']}" for file in st.session_state.uploaded_files]
-            # Persist selected file for chat
-            current_selected_chat_file = st.session_state.get("selected_chat_file_name_for_file_mode")
-            if current_selected_chat_file not in file_options_chat and file_options_chat:
-                st.session_state.selected_chat_file_name_for_file_mode = file_options_chat[0]
-            elif not file_options_chat:
-                st.session_state.selected_chat_file_name_for_file_mode = None
-
-            selected_chat_file_name = st.selectbox(
-                "Select a file to discuss:",
-                file_options_chat,
-                index=file_options_chat.index(st.session_state.selected_chat_file_name_for_file_mode) if st.session_state.selected_chat_file_name_for_file_mode and st.session_state.selected_chat_file_name_for_file_mode in file_options_chat else 0,
-                key="file_chat_selector_widget"
-            )
-            st.session_state.selected_chat_file_name_for_file_mode = selected_chat_file_name
-
-            if selected_chat_file_name:
-                selected_file_to_chat_info = next((f for f in st.session_state.uploaded_files if f['name'] == selected_chat_file_name), None)
-                if selected_file_to_chat_info:
-                    st.info(f"Ask questions about '{selected_file_to_chat_info['name']}'")
-
-                    for msg in st.session_state.file_messages:
-                        with st.chat_message(msg["role"]):
-                            st.markdown(msg["content"])
-
-                    file_prompt = st.chat_input(f"Ask about {selected_file_to_chat_info['name']}...")
-
-                    if file_prompt and st.session_state.api_key:
-                        st.chat_message("user").markdown(file_prompt)
-                        st.session_state.file_messages.append({"role": "user", "content": file_prompt})
-
-                        system_prompt_file = get_file_chat_system_prompt(file_prompt, file_chat_mode, selected_file_to_chat_info['name'])
-
-                        with st.spinner(f"Analyzing '{selected_file_to_chat_info['name']}'..."):
-                            try:
-                                if "file_chat" not in st.session_state or not st.session_state.file_chat.history :
-                                     st.session_state.file_chat = initialize_model(
-                                        FILE_ANALYSIS_MODEL_NAME,
-                                        DEFAULT_GENERATION_CONFIG,
-                                        history=st.session_state.file_messages
-                                    )
-                                # Ensure model config is up-to-date if it can be changed for file mode
-                                # For now, using DEFAULT_GENERATION_CONFIG
-
-                                response = st.session_state.file_chat.send_message(system_prompt_file)
-                                reply = response.text
-
-                            except genai.types.generation_types.BlockedPromptException as e:
-                                st.error(f"Your prompt regarding the file was blocked. Reason: {e}")
-                                reply = "My apologies, I cannot process that request for the file as it was blocked."
-                            except Exception as e:
-                                st.error(f"Error processing request for {selected_file_to_chat_info['name']}: {str(e)}")
-                                reply = f"Sorry, an error occurred while processing your request for {selected_file_to_chat_info['name']}: {str(e)}"
-
-                            if reply:
-                                st.chat_message("assistant").markdown(reply)
-                                st.session_state.file_messages.append({"role": "assistant", "content": reply})
-
-                    if st.session_state.file_messages:
-                        if st.button("Export File Chat History"):
-                            export_filename = export_to_json(
-                                st.session_state.file_messages,
-                                filename_prefix="file_chat",
-                                chat_mode=file_chat_mode,
-                                original_filename=selected_file_to_chat_info['name']
-                            )
-                            try:
-                                with open(export_filename, "rb") as f_export:
-                                    st.download_button(
-                                        label="📄 Download File Chat JSON",
-                                        data=f_export,
-                                        file_name=export_filename,
-                                        mime="application/json"
-                                    )
-                            except FileNotFoundError:
-                                st.error(f"Could not find exported file: {export_filename}")
-                else:
-                    st.warning("Selected file for chat not found. Please re-select or upload.")
-        else:
-            st.info("Upload files to start chatting about them.")
-            st.markdown("""
-            ##### Example Questions You Can Ask About Documents:
-            - "Summarize the key points in this document."
-            - "What are the main topics covered in chapter 3?"
-            - "Extract all email addresses mentioned in the text."
-            - "What is the conclusion of this research paper?"
-            """)
-
-st.markdown("---")
-st.markdown(get_footer_style(), unsafe_allow_html=True)
+        api_key = st.text_input("Enter your Gemini API key:", type="password", key="file_api_key")
+        
+        if api_key:
+            genai.configure(api_key=api_key)
+            st.session_state.api_key = api_key
+            st.success("API key set successfully!", icon="✅")
+            
+            # Initialize chat for file mode if not exists
+            if "file_chat" not in st.session_state:
+                st.session_state.file_chat = genai.GenerativeModel(
+                    model_name="gemini-2.0-flash",
+                    generation_config={
+                        "max_output_tokens": 8192,
+                        "temperature": 0.7,
+                        "top_p": 0.95,
+                        "top_k": 40
+                    }
+                ).start_chat(history=[])
         else:
             st.warning("Enter Gemini API key to begin", icon="⚠️")
         
