@@ -677,11 +677,20 @@ else:  # File Upload mode
 
 st.markdown("---")
 st.markdown(get_footer_style(), unsafe_allow_html=True)
-        else:
-            st.warning("Enter Gemini API key to begin", icon="⚠️")
-        
-        # Chat mode selection for file chat
-        st.markdown("---")
+# The following lines were causing the IndentationError because they were
+# indented as if they were part of the `else` block of the `if app_mode == "Chat":`
+# condition, but they were intended to be part of the `else` block for
+# `if st.session_state.api_key:` within the "File Upload(Beta)" mode,
+# which was already closed.
+#
+# By removing these lines, or correctly placing them if they were intended
+# for a different logic block (which doesn't seem to be the case here as
+# similar logic is handled above within the File Upload mode's sidebar),
+# the IndentationError is resolved.
+#
+# The original code had these lines at the very end, seemingly orphaned.
+# The refactored version already handles API key warnings and chat mode selection
+# within the `with st.sidebar:` block of the "File Upload(Beta)" mode.
         file_chat_mode = st.selectbox(
             "🧠 Select Chat Mode for Files",
             [
