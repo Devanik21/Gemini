@@ -339,8 +339,15 @@ class GeminiChat:
         try:
             # Check if it's an image generation request
             if self.is_image_generation_request(prompt) and self.image_model:
-                response = self.image_model.generate_content([prompt])
-                return response, "image"
+               # Configure generation for both text and image
+               generation_config = {
+                   'response_modalities': ['TEXT', 'IMAGE']
+               }
+               response = self.image_model.generate_content(
+                   [prompt],
+                   generation_config=generation_config
+               )
+               return response, "image"
             
             # Prepare content for text model
             content_parts = []
