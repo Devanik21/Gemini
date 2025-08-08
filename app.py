@@ -615,7 +615,7 @@ def main():
             st.markdown(f"""
             <div class="chat-message assistant-message">
                 <strong>🧠 Gemini:</strong> {escaped_content}
-            </div>
+            
             """, unsafe_allow_html=True)
 
             # Display generated image if it exists
