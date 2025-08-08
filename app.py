@@ -88,7 +88,10 @@ class GeminiChat:
         if self.api_key:
             genai.configure(api_key=self.api_key)
             self.text_model = genai.GenerativeModel('gemma-3n-e4b-it')
-            self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
+            try:
+                self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
+            except:
+                self.image_model = None
         
     def is_image_generation_request(self, prompt):
         """Check if prompt is for image generation"""
@@ -98,104 +101,176 @@ class GeminiChat:
     
     def process_uploaded_file(self, uploaded_file):
         """Process different file types"""
-        file_extension = uploaded_file.name.split('.')[-1].lower()
-        content = ""
-        
-        if file_extension == 'pdf':
-            pdf_reader = PyPDF2.PdfReader(uploaded_file)
-            for page in pdf_reader.pages:
-                content += page.extract_text()
-        elif file_extension in ['txt', 'md']:
-            content = str(uploaded_file.read(), "utf-8")
-        elif file_extension == 'docx':
-            doc = docx.Document(uploaded_file)
-            content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
-        elif file_extension in ['csv']:
-            df = pd.read_csv(uploaded_file)
-            content = df.to_string()
-        elif file_extension in ['json']:
-            data = json.load(uploaded_file)
-            content = json.dumps(data, indent=2)
-        elif file_extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-            return uploaded_file  # Return image file as is
-        
-        return content
+        try:
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+            content = ""
+            
+            if file_extension == 'pdf':
+                pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                for page in pdf_reader.pages:
+                    content += page.extract_text()
+            elif file_extension in ['txt', 'md']:
+                content = str(uploaded_file.read(), "utf-8")
+            elif file_extension == 'docx':
+                doc = docx.Document(uploaded_file)
+                content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+            elif file_extension in ['csv']:
+                df = pd.read_csv(uploaded_file)
+                content = df.head(100).to_string()  # Limit rows
+            elif file_extension in ['json']:
+                data = json.load(uploaded_file)
+                content = json.dumps(data, indent=2)[:5000]  # Limit size
+            elif file_extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                # Convert image to base64 string for storage
+                image = Image.open(uploaded_file)
+                buffer = BytesIO()
+                image.save(buffer, format='PNG')
+                img_str = base64.b64encode(buffer.getvalue()).decode()
+                return f"[IMAGE_DATA:{img_str[:100]}...]"  # Truncated for storage
+            
+            return content[:10000]  # Limit content size
+        except Exception as e:
+            return f"Error processing file {uploaded_file.name}: {str(e)}"
     
     def generate_response(self, prompt, files=None, context=None):
         """Generate response using Gemini API"""
         try:
             # Check if it's an image generation request
-            if self.is_image_generation_request(prompt):
+            if self.is_image_generation_request(prompt) and self.image_model:
                 response = self.image_model.generate_content([prompt])
                 return response, "image"
             
             # Prepare content for text model
-            content_parts = [prompt]
+            content_parts = []
             
             # Add context from previous messages
             if context:
-                context_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in context[-10:]])
-                content_parts.insert(0, f"Previous context:\n{context_text}\n\nCurrent request:")
+                context_text = "\n".join([f"{msg['role']}: {msg['content'][:500]}" for msg in context[-5:]])
+                content_parts.append(f"Context: {context_text}")
             
             # Add uploaded files content
             if files:
-                for file_content in files:
-                    if isinstance(file_content, str):
-                        content_parts.append(f"File content:\n{file_content}")
-                    else:  # Image file
-                        content_parts.append(file_content)
+                for i, file_content in enumerate(files):
+                    if isinstance(file_content, str) and not file_content.startswith("[IMAGE_DATA"):
+                        content_parts.append(f"File {i+1}: {file_content[:2000]}")
             
-            response = self.text_model.generate_content(content_parts)
+            content_parts.append(f"User request: {prompt}")
+            
+            response = self.text_model.generate_content("\n\n".join(content_parts))
             return response, "text"
             
         except Exception as e:
-            return f"Error generating response: {str(e)}", "error"
+            return f"Error: {str(e)}", "error"
     
-    def save_chat_to_db(self, chat_data):
-        """Save chat to TinyDB"""
-        st.session_state.db.insert(chat_data)
+    def save_chat_to_db(self, messages, chat_id):
+        """Save chat to TinyDB with serializable data only"""
+        try:
+            # Create serializable version of messages
+            serializable_messages = []
+            for msg in messages:
+                clean_msg = {
+                    "role": msg["role"],
+                    "content": msg["content"][:5000],  # Limit content size
+                    "timestamp": msg.get("timestamp", datetime.now().isoformat())
+                }
+                serializable_messages.append(clean_msg)
+            
+            chat_data = {
+                "chat_id": chat_id,
+                "messages": serializable_messages,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Remove existing chat with same ID
+            Chat = Query()
+            st.session_state.db.remove(Chat.chat_id == chat_id)
+            
+            # Insert new chat data
+            st.session_state.db.insert(chat_data)
+            
+        except Exception as e:
+            st.error(f"Error saving chat: {str(e)}")
     
     def load_chat_history(self, chat_id):
         """Load chat history from DB"""
-        Chat = Query()
-        return st.session_state.db.search(Chat.chat_id == chat_id)
+        try:
+            Chat = Query()
+            return st.session_state.db.search(Chat.chat_id == chat_id)
+        except:
+            return []
 
 def create_audio(text, lang='en'):
     """Create audio from text using gTTS"""
     try:
-        tts = gTTS(text=text, lang=lang, slow=False)
-        fp = BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        return fp
-    except:
+        # Clean and limit text
+        clean_text = text.replace('\n', ' ').strip()[:1000]
+        if not clean_text:
+            return None
+            
+        tts = gTTS(text=clean_text, lang=lang, slow=False)
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
+            tts.save(tmp_file.name)
+            
+            # Read file and create BytesIO object
+            with open(tmp_file.name, 'rb') as f:
+                audio_bytes = f.read()
+            
+            # Clean up temp file
+            os.unlink(tmp_file.name)
+            
+            return audio_bytes
+            
+    except Exception as e:
+        st.error(f"Audio generation failed: {str(e)}")
         return None
 
 def create_download_options(content, content_type="text"):
     """Create download options for different formats"""
     downloads = {}
     
-    if content_type == "text":
-        # Text file
-        downloads['txt'] = content.encode('utf-8')
-        
-        # Markdown file
-        downloads['md'] = f"# Gemini Response\n\n{content}".encode('utf-8')
-        
-        # JSON file
-        downloads['json'] = json.dumps({"response": content, "timestamp": datetime.now().isoformat()}).encode('utf-8')
+    if content_type == "text" and content:
+        try:
+            # Text file
+            downloads['txt'] = content.encode('utf-8')
+            
+            # Markdown file
+            downloads['md'] = f"# Gemini Response\n\n{content}".encode('utf-8')
+            
+            # JSON file
+            data = {
+                "response": content,
+                "timestamp": datetime.now().isoformat()
+            }
+            downloads['json'] = json.dumps(data, indent=2).encode('utf-8')
+        except Exception as e:
+            st.error(f"Error creating downloads: {str(e)}")
     
     return downloads
 
-def export_chat_history():
-    """Export entire chat history"""
-    if st.session_state.messages:
-        chat_data = {
-            "chat_id": st.session_state.chat_id,
-            "messages": st.session_state.messages,
-            "timestamp": datetime.now().isoformat()
-        }
-        return json.dumps(chat_data, indent=2).encode('utf-8')
+def export_chat_history(messages, chat_id):
+    """Export chat history as JSON"""
+    try:
+        if messages:
+            # Create clean export data
+            export_messages = []
+            for msg in messages:
+                clean_msg = {
+                    "role": msg["role"],
+                    "content": msg["content"],
+                    "timestamp": msg.get("timestamp", datetime.now().isoformat())
+                }
+                export_messages.append(clean_msg)
+            
+            chat_data = {
+                "chat_id": chat_id,
+                "messages": export_messages,
+                "export_timestamp": datetime.now().isoformat()
+            }
+            return json.dumps(chat_data, indent=2).encode('utf-8')
+    except Exception as e:
+        st.error(f"Export failed: {str(e)}")
     return None
 
 def main():
@@ -232,120 +307,149 @@ def main():
         
         # Process uploaded files
         if uploaded_files:
-            st.session_state.uploaded_files = []
-            for file in uploaded_files:
-                processed_content = st.session_state.gemini_chat.process_uploaded_file(file)
-                st.session_state.uploaded_files.append(processed_content)
-                st.success(f"✅ {file.name}")
+            with st.spinner("Processing files..."):
+                st.session_state.uploaded_files = []
+                for file in uploaded_files:
+                    try:
+                        processed_content = st.session_state.gemini_chat.process_uploaded_file(file)
+                        st.session_state.uploaded_files.append(processed_content)
+                        st.success(f"✅ {file.name}")
+                    except Exception as e:
+                        st.error(f"❌ {file.name}: {str(e)}")
         
         # Advanced Features
         st.subheader("🚀 Advanced Features")
         
         # Smart Context Management
         with st.expander("🧠 Smart Context"):
-            context_length = st.slider("Context Messages", 5, 50, 10)
-            st.info("Maintains conversation context for better responses")
+            context_length = st.slider("Context Messages", 3, 20, 5)
+            st.info("Maintains conversation context")
         
         # Multi-language Support
         with st.expander("🌐 Language Options"):
-            audio_lang = st.selectbox("Audio Language", ['en', 'es', 'fr', 'de', 'it', 'pt', 'hi'])
-            st.info("Text-to-speech in multiple languages")
+            audio_lang = st.selectbox("Audio Language", 
+                ['en', 'es', 'fr', 'de', 'it', 'pt', 'hi', 'ja', 'ko', 'zh'])
         
         # Response Style
         with st.expander("✨ Response Style"):
-            response_style = st.selectbox("Style", ['Professional', 'Creative', 'Technical', 'Casual'])
-            st.info("Customize AI response tone")
+            response_style = st.selectbox("Style", 
+                ['Professional', 'Creative', 'Technical', 'Casual', 'Academic'])
+        
+        # Model Selection
+        with st.expander("🤖 Model Options"):
+            use_fast_mode = st.checkbox("Fast Mode", value=False)
+            st.info("Optimizes for speed over detail")
+        
+        # Auto-save toggle
+        with st.expander("💾 Storage Options"):
+            auto_save = st.checkbox("Auto-save conversations", value=True)
+            if st.button("Clear All History", type="secondary"):
+                st.session_state.db.truncate()
+                st.success("History cleared!")
         
         # Export Options
         st.subheader("💾 Export & Download")
         if st.session_state.messages:
-            chat_export = export_chat_history()
+            chat_export = export_chat_history(st.session_state.messages, st.session_state.chat_id)
             if chat_export:
                 st.download_button(
-                    "📥 Download Chat History",
+                    "📥 Download Chat",
                     chat_export,
-                    file_name=f"chat_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    file_name=f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json"
                 )
         
-        # Clear Chat
-        if st.button("🗑️ Clear Chat", type="secondary"):
+        # New Chat
+        if st.button("🆕 New Chat", type="primary"):
+            # Save current chat if auto-save is enabled
+            if auto_save and st.session_state.messages:
+                st.session_state.gemini_chat.save_chat_to_db(
+                    st.session_state.messages, 
+                    st.session_state.chat_id
+                )
+            
             st.session_state.messages = []
             st.session_state.chat_id = str(uuid.uuid4())
+            st.session_state.uploaded_files = []
             st.rerun()
     
     # Main Chat Interface
-    col1, col2, col3 = st.columns([1, 6, 1])
-    
-    with col2:
-        # Display Chat Messages
-        chat_container = st.container()
-        
-        with chat_container:
-            for message in st.session_state.messages:
-                if message["role"] == "user":
-                    st.markdown(f"""
-                    <div class="chat-message user-message">
-                        <strong>You:</strong> {message["content"]}
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="chat-message assistant-message">
-                        <strong>🧠 Gemini:</strong> {message["content"]}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Audio playback for assistant messages
-                    if "audio_data" in message:
-                        st.audio(message["audio_data"])
-                    
-                    # Download options
-                    if message["content"]:
-                        downloads = create_download_options(message["content"])
-                        cols = st.columns(len(downloads))
-                        for i, (format_type, data) in enumerate(downloads.items()):
-                            with cols[i]:
-                                st.download_button(
-                                    f"📥 {format_type.upper()}",
-                                    data,
-                                    file_name=f"response_{len(st.session_state.messages)}_{i}.{format_type}",
-                                    mime=f"text/{format_type}" if format_type != 'json' else "application/json",
-                                    key=f"download_{len(st.session_state.messages)}_{i}"
-                                )
-        
-        # Chat Input
-        prompt = st.chat_input("Ask Gemini anything... (supports image generation, file analysis, and more!)")
-        
-        if prompt:
-            # Add user message
-            st.session_state.messages.append({"role": "user", "content": prompt})
+    # Display Chat Messages
+    for i, message in enumerate(st.session_state.messages):
+        if message["role"] == "user":
+            st.markdown(f"""
+            <div class="chat-message user-message">
+                <strong>You:</strong> {message["content"]}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="chat-message assistant-message">
+                <strong>🧠 Gemini:</strong> {message["content"]}
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Show typing indicator
-            with st.spinner("🧠 Gemini is thinking..."):
+            # Audio playback for assistant messages
+            if "audio_bytes" in message and message["audio_bytes"]:
+                st.audio(message["audio_bytes"])
+            
+            # Download options
+            if message["content"]:
+                downloads = create_download_options(message["content"])
+                if downloads:
+                    cols = st.columns(len(downloads))
+                    for j, (format_type, data) in enumerate(downloads.items()):
+                        with cols[j]:
+                            st.download_button(
+                                f"📥 {format_type.upper()}",
+                                data,
+                                file_name=f"response_{i}_{j}.{format_type}",
+                                mime=f"text/{format_type}" if format_type != 'json' else "application/json",
+                                key=f"download_{i}_{j}"
+                            )
+    
+    # Chat Input
+    prompt = st.chat_input("Ask Gemini anything... (supports image generation, file analysis, and more!)")
+    
+    if prompt:
+        # Add user message
+        user_message = {
+            "role": "user", 
+            "content": prompt,
+            "timestamp": datetime.now().isoformat()
+        }
+        st.session_state.messages.append(user_message)
+        
+        # Show typing indicator and generate response
+        with st.spinner("🧠 Gemini is thinking..."):
+            try:
                 # Prepare context and files
-                context = st.session_state.messages[:-1] if len(st.session_state.messages) > 1 else None
+                context = st.session_state.messages[-context_length:] if len(st.session_state.messages) > 1 else None
                 files = st.session_state.uploaded_files if st.session_state.uploaded_files else None
                 
                 # Add response style to prompt
                 styled_prompt = f"[{response_style} style] {prompt}"
+                if use_fast_mode:
+                    styled_prompt = f"[Brief response] {styled_prompt}"
                 
                 # Generate response
                 response, response_type = st.session_state.gemini_chat.generate_response(
                     styled_prompt, files, context
                 )
                 
+                # Process response
                 if response_type == "error":
                     response_text = response
                 elif response_type == "image":
-                    # Handle image generation response
                     response_text = response.text if hasattr(response, 'text') else "Image generated successfully!"
-                    # Note: Image handling would need additional setup for display
+                    # Handle image display here if needed
                 else:
                     response_text = response.text if hasattr(response, 'text') else str(response)
                 
                 # Create audio
-                audio_data = create_audio(response_text[:500], audio_lang)  # Limit audio length
+                audio_bytes = None
+                if response_text and len(response_text.strip()) > 0:
+                    audio_bytes = create_audio(response_text, audio_lang)
                 
                 # Add assistant message
                 assistant_message = {
@@ -354,53 +458,46 @@ def main():
                     "timestamp": datetime.now().isoformat()
                 }
                 
-                if audio_data:
-                    assistant_message["audio_data"] = audio_data
+                if audio_bytes:
+                    assistant_message["audio_bytes"] = audio_bytes
                 
                 st.session_state.messages.append(assistant_message)
                 
-                # Save to database
-                chat_data = {
-                    "chat_id": st.session_state.chat_id,
-                    "messages": st.session_state.messages,
+                # Auto-save to database
+                if auto_save:
+                    st.session_state.gemini_chat.save_chat_to_db(
+                        st.session_state.messages, 
+                        st.session_state.chat_id
+                    )
+                
+            except Exception as e:
+                error_message = {
+                    "role": "assistant",
+                    "content": f"I apologize, but I encountered an error: {str(e)}",
                     "timestamp": datetime.now().isoformat()
                 }
-                st.session_state.gemini_chat.save_chat_to_db(chat_data)
-            
-            # Rerun to show new message
-            st.rerun()
+                st.session_state.messages.append(error_message)
+        
+        # Rerun to show new message
+        st.rerun()
 
-    # Footer with advanced features info
+    # Footer
     st.markdown("---")
-    with st.expander("🌟 Advanced Features Available"):
+    st.markdown("### 🌟 Features: File Upload • Image Generation • Multi-language Audio • Smart Context • Export Options")
+    
+    # Stats
+    if st.session_state.messages:
         col1, col2, col3 = st.columns(3)
-        
         with col1:
-            st.markdown("""
-            **🎯 Smart Features:**
-            - Universal file upload support
-            - Persistent chat sessions
-            - Context-aware responses
-            - Multi-format downloads
-            """)
-        
+            st.metric("Messages", len(st.session_state.messages))
         with col2:
-            st.markdown("""
-            **🎨 AI Capabilities:**
-            - Text generation & analysis
-            - Image generation (on request)
-            - Document processing
-            - Data analysis
-            """)
-        
+            st.metric("Files Uploaded", len(st.session_state.uploaded_files))
         with col3:
-            st.markdown("""
-            **🔧 Professional Tools:**
-            - TinyDB storage
-            - Audio responses (TTS)
-            - Export/Import chats
-            - Multi-language support
-            """)
+            try:
+                total_chats = len(st.session_state.db.all())
+                st.metric("Total Conversations", total_chats)
+            except:
+                st.metric("Total Conversations", "N/A")
 
 if __name__ == "__main__":
     main()
