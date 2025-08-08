@@ -638,7 +638,7 @@ def main():
                                 data,
                                 file_name=f"response_{i}_{j}.{format_type}",
                                 mime=f"text/{format_type}" if format_type != 'json' else "application/json",
-                                key=f"download_{i}_{j}"
+                                key=f"downloadmd3iiiiii3imiwod83ffffff4klq3n43_{i}_{j}"
                             )
             
             # Audio playback for assistant messages
@@ -657,7 +657,7 @@ def main():
                                 data,
                                 file_name=f"response_{i}_{j}.{format_type}",
                                 mime=f"text/{format_type}" if format_type != 'json' else "application/json",
-                                key=f"download_{i}_{j}"
+                                key=f"downloadf4322222222222ni4_{i}_{j}"
                             )
     
     # Chat Input
