@@ -8,6 +8,7 @@ from PIL import Image
 import tempfile
 import os
 from datetime import datetime
+import re
 import uuid
 import time
 from gtts import gTTS
@@ -589,9 +590,10 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         else:
+            clean_content = re.sub(r'<[^>]+>', '', message["content"])
             st.markdown(f"""
             <div class="chat-message assistant-message">
-                <strong>🧠 Gemini:</strong> {message["content"]}
+                <strong>🧠 Gemini:</strong> {clean_content}
             </div>
             """, unsafe_allow_html=True)
             
