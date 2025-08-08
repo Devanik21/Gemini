@@ -289,10 +289,14 @@ class GeminiChat:
         self.api_key = st.secrets.get("GEMINI_API_KEY", "")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.text_model = genai.GenerativeModel('gemma-3n-e4b-it')
+            # Use current, publicly available and capable models
+            # gemini-1.5-flash is a fast, multimodal model for chat and analysis
+            self.text_model = genai.GenerativeModel('gemini-1.5-flash-latest')
             try:
-                self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
-            except:
+                # Gemini 1.5 Pro is powerful and can generate images
+                self.image_model = genai.GenerativeModel('gemini-1.5-pro-latest')
+            except Exception as e:
+                st.warning(f"Could not initialize the image generation model: {e}")
                 self.image_model = None
         
     def is_image_generation_request(self, prompt):
@@ -302,11 +306,16 @@ class GeminiChat:
         return any(keyword in prompt.lower() for keyword in image_keywords)
     
     def process_uploaded_file(self, uploaded_file):
-        """Process different file types"""
+        """Process different file types. Returns content as string or PIL Image."""
         try:
             file_extension = uploaded_file.name.split('.')[-1].lower()
-            content = ""
             
+            if file_extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                # For images, return a PIL Image object for the model to analyze
+                image = Image.open(uploaded_file)
+                return image
+            
+            content = ""
             if file_extension == 'pdf':
                 pdf_reader = PyPDF2.PdfReader(uploaded_file)
                 for page in pdf_reader.pages:
@@ -318,76 +327,74 @@ class GeminiChat:
                 content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
             elif file_extension in ['csv']:
                 df = pd.read_csv(uploaded_file)
-                content = df.head(100).to_string()  # Limit rows
-            elif file_extension in ['json']:
+                content = df.head(100).to_string()
+            elif file_extension == 'json':
                 data = json.load(uploaded_file)
-                content = json.dumps(data, indent=2)[:5000]  # Limit size
-            elif file_extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-                # Convert image to base64 string for storage
-                image = Image.open(uploaded_file)
-                buffer = BytesIO()
-                image.save(buffer, format='PNG')
-                img_str = base64.b64encode(buffer.getvalue()).decode()
-                return f"[IMAGE_DATA:{img_str[:100]}...]"  # Truncated for storage
+                content = json.dumps(data, indent=2)[:5000]
             
-            return content[:10000]  # Limit content size
+            return content[:10000]
         except Exception as e:
+            # Return the error as a string so it can be displayed to the user
             return f"Error processing file {uploaded_file.name}: {str(e)}"
-    
+
     def generate_response(self, prompt, files=None, context=None):
-        """Generate response using Gemini API"""
+        """Generate response using Gemini API for image generation OR for analyzing text, files, and uploaded images."""
         try:
-            # Check if it's an image generation request
+            # First, check if the user wants to CREATE an image.
+            # This flow is separate from analyzing uploaded files.
             if self.is_image_generation_request(prompt) and self.image_model:
                 try:
-                    # Use the model without brackets around prompt
-                    response = self.image_model.generate_content(
-                        prompt,
-                        generation_config={
-                            'response_modalities': ['TEXT', 'IMAGE']
-                        }
-                    )
-                    return response, "image"
+                    image_prompt = re.sub(r'\[.*?\]\s*', '', prompt).strip()
+                    response = self.image_model.generate_content(image_prompt)
+                    
+                    if hasattr(response, 'parts') and any(p.mime_type.startswith("image/") for p in response.parts):
+                        return response, "image" # Return type for image creation
+                    else:
+                        return response, "text"
                 except Exception as e:
-                    # Fallback to text description
-                    fallback_response = self.text_model.generate_content(f"I'll describe instead: {prompt}")
+                    fallback_prompt = f"I tried to generate an image for '{prompt}', but an error occurred. Here is a text description instead: {prompt}"
+                    fallback_response = self.text_model.generate_content(fallback_prompt)
                     return fallback_response, "text"
-            
-            # Prepare content for text model
-            content_parts = []
-            
-            # Add context from previous messages
+
+            # This is the flow for analyzing inputs (text, uploaded files, and uploaded images).
+            model_input = []
+
             if context:
                 context_text = "\n".join([f"{msg['role']}: {msg['content'][:500]}" for msg in context[-5:]])
-                content_parts.append(f"Context: {context_text}")
-            
-            # Add uploaded files content
+                model_input.append(f"Context from conversation:\n{context_text}\n---")
+
+            # Add uploaded files (text or images) to the model input
             if files:
-                for i, file_content in enumerate(files):
-                    if isinstance(file_content, str) and not file_content.startswith("[IMAGE_DATA"):
-                        content_parts.append(f"File {i+1}: {file_content[:2000]}")
+                model_input.append("Please analyze the following uploaded file(s) to answer the user's request:")
+                for file_content in files:
+                    if isinstance(file_content, str):
+                        model_input.append(f"--- File Content ---\n{file_content[:4000]}")
+                    elif isinstance(file_content, Image.Image):
+                        # Add the PIL image object directly to the input
+                        model_input.append(file_content)
             
-            content_parts.append(f"User request: {prompt}")
+            # Add the user's prompt to the end of the input list
+            model_input.append(f"\n--- User's Request ---\n{prompt}")
             
-            response = self.text_model.generate_content("\n\n".join(content_parts))
+            # Generate a response from the combined multimodal input
+            response = self.text_model.generate_content(model_input)
             return response, "text"
             
         except Exception as e:
             return f"Error: {str(e)}", "error"
-    
+
     def save_chat_to_db(self, chat_data):
         """Save chat to TinyDB with serializable data only"""
         try:
-            # Extract messages and chat_id from chat_data
             messages = chat_data.get('messages', [])
             chat_id = chat_data.get('chat_id', str(uuid.uuid4()))
             
-            # Create serializable version of messages
             serializable_messages = []
             for msg in messages:
+                # Exclude non-serializable data like image bytes before saving
                 clean_msg = {
                     "role": msg["role"],
-                    "content": msg["content"][:5000],  # Limit content size
+                    "content": msg["content"][:5000],
                     "timestamp": msg.get("timestamp", datetime.now().isoformat())
                 }
                 serializable_messages.append(clean_msg)
@@ -398,16 +405,13 @@ class GeminiChat:
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Remove existing chat with same ID
             Chat = Query()
             st.session_state.db.remove(Chat.chat_id == chat_id)
-            
-            # Insert new chat data
             st.session_state.db.insert(clean_chat_data)
             
         except Exception as e:
             st.error(f"Error saving chat: {str(e)}")
-    
+
     def load_chat_history(self, chat_id):
         """Load chat history from DB"""
         try:
