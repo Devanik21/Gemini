@@ -363,9 +363,13 @@ class GeminiChat:
         except Exception as e:
             return f"Error: {str(e)}", "error"
     
-    def save_chat_to_db(self, messages, chat_id):
+    def save_chat_to_db(self, chat_data):
         """Save chat to TinyDB with serializable data only"""
         try:
+            # Extract messages and chat_id from chat_data
+            messages = chat_data.get('messages', [])
+            chat_id = chat_data.get('chat_id', str(uuid.uuid4()))
+            
             # Create serializable version of messages
             serializable_messages = []
             for msg in messages:
@@ -376,7 +380,7 @@ class GeminiChat:
                 }
                 serializable_messages.append(clean_msg)
             
-            chat_data = {
+            clean_chat_data = {
                 "chat_id": chat_id,
                 "messages": serializable_messages,
                 "timestamp": datetime.now().isoformat()
@@ -387,7 +391,7 @@ class GeminiChat:
             st.session_state.db.remove(Chat.chat_id == chat_id)
             
             # Insert new chat data
-            st.session_state.db.insert(chat_data)
+            st.session_state.db.insert(clean_chat_data)
             
         except Exception as e:
             st.error(f"Error saving chat: {str(e)}")
