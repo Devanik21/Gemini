@@ -4,9 +4,7 @@ PyPDF2
 python-docx
 pandas
 numpy
-plotly
 pillow
-requests
 fpdf
 openpyxl
 tinydb 
