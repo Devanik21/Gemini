@@ -288,7 +288,7 @@ class GeminiChat:
         self.api_key = st.secrets.get("GEMINI_API_KEY", "")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.text_model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            self.text_model = genai.GenerativeModel('gemma-3n-e4b-it')
             try:
                 self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
             except:
