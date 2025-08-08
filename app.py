@@ -646,19 +646,7 @@ def main():
             #    st.audio(message["audio_bytes"])
             
             # Download options
-            if message["content"]:
-                downloads = create_download_options(message["content"])
-                if downloads:
-                    cols = st.columns(len(downloads))
-                    for j, (format_type, data) in enumerate(downloads.items()):
-                        with cols[j]:
-                            st.download_button(
-                                f"📥 {format_type.upper()}",
-                                data,
-                                file_name=f"response_{i}_{j}.{format_type}",
-                                mime=f"text/{format_type}" if format_type != 'json' else "application/json",
-                                key=f"downloadf4322222222222ni4_{i}_{j}"
-                            )
+            
     
     # Chat Input
     prompt = st.chat_input("Ask Gemini anything... (supports image generation, file analysis, and more!)")
