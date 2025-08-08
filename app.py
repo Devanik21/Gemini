@@ -670,10 +670,11 @@ def main():
                 
                 # Auto-save to database
                 if auto_save:
-                    st.session_state.gemini_chat.save_chat_to_db(
-                        st.session_state.messages, 
-                        st.session_state.chat_id
-                    )
+                    chat_data = {
+                        'messages': st.session_state.messages,
+                        'chat_id': st.session_state.chat_id
+                    }
+                    st.session_state.gemini_chat.save_chat_to_db(chat_data)
                 
             except Exception as e:
                 error_message = {
