@@ -642,8 +642,8 @@ def main():
                             )
             
             # Audio playback for assistant messages
-            if "audio_bytes" in message and message["audio_bytes"]:
-                st.audio(message["audio_bytes"])
+          #  if "audio_bytes" in message and message["audio_bytes"]:
+            #    st.audio(message["audio_bytes"])
             
             # Download options
             if message["content"]:
