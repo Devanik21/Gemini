@@ -339,15 +339,19 @@ class GeminiChat:
         try:
             # Check if it's an image generation request
             if self.is_image_generation_request(prompt) and self.image_model:
-               # Configure generation for both text and image
-               generation_config = {
-                   'response_modalities': ['TEXT', 'IMAGE']
-               }
-               response = self.image_model.generate_content(
-                   [prompt],
-                   generation_config=generation_config
-               )
-               return response, "image"
+                try:
+                    # Use the model without brackets around prompt
+                    response = self.image_model.generate_content(
+                        prompt,
+                        generation_config={
+                            'response_modalities': ['TEXT', 'IMAGE']
+                        }
+                    )
+                    return response, "image"
+                except Exception as e:
+                    # Fallback to text description
+                    fallback_response = self.text_model.generate_content(f"I'll describe instead: {prompt}")
+                    return fallback_response, "text"
             
             # Prepare content for text model
             content_parts = []
