@@ -36,47 +36,248 @@ if 'db' not in st.session_state:
 if 'uploaded_files' not in st.session_state:
     st.session_state.uploaded_files = []
 
-# Custom CSS
+# Custom CSS - Modern Dark Theme
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    
+    .stApp {
+        background: #0a0a0b;
+        color: #e8e9ea;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .main {
+        background: #0a0a0b;
+        padding: 0 !important;
+    }
+    
     .main-header {
         text-align: center;
-        padding: 2rem 0;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        border-radius: 10px;
+        padding: 2rem 1rem;
+        background: linear-gradient(135deg, #1e1e2e 0%, #2d3748 50%, #1a1a2e 100%);
+        border-radius: 16px;
         margin-bottom: 2rem;
-        color: white;
+        color: #f7fafc;
+        border: 1px solid #2d3748;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(10px);
     }
+    
+    .main-header h1 {
+        font-weight: 600;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #64b5f6 0%, #9c88ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .main-header p {
+        color: #a0aec0;
+        font-weight: 400;
+    }
+    
     .chat-message {
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 1.25rem;
+        border-radius: 12px;
+        margin: 1.5rem 0;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
     }
+    
+    .chat-message:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
     .user-message {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        margin-left: 20%;
+        color: #ffffff;
+        margin-left: 15%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
+    
     .assistant-message {
-        background: #f8f9fa;
-        border-left: 4px solid #667eea;
+        background: rgba(45, 55, 72, 0.6);
+        border-left: 3px solid #64b5f6;
+        color: #e8e9ea;
+        margin-right: 15%;
     }
-    .file-upload-area {
-        border: 2px dashed #667eea;
-        border-radius: 10px;
+    
+    .stSidebar {
+        background: rgba(26, 32, 44, 0.95) !important;
+        border-right: 1px solid #2d3748 !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div {
+        background: rgba(45, 55, 72, 0.8);
+        border: 1px solid #4a5568;
+        color: #e8e9ea;
+    }
+    
+    .stSidebar .stSlider > div > div {
+        color: #e8e9ea;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    }
+    
+    .stTextInput > div > div > input {
+        background: rgba(45, 55, 72, 0.8);
+        color: #e8e9ea;
+        border: 1px solid #4a5568;
+        border-radius: 8px;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #64b5f6;
+        box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+    }
+    
+    .stFileUploader {
+        background: rgba(45, 55, 72, 0.6);
+        border: 2px dashed #4a5568;
+        border-radius: 12px;
         padding: 2rem;
-        text-align: center;
-        margin: 1rem 0;
+        transition: all 0.3s ease;
     }
-    .feature-card {
-        background: white;
+    
+    .stFileUploader:hover {
+        border-color: #64b5f6;
+        background: rgba(45, 55, 72, 0.8);
+    }
+    
+    .stExpander {
+        background: rgba(45, 55, 72, 0.4);
+        border: 1px solid #4a5568;
+        border-radius: 8px;
+        margin: 0.5rem 0;
+    }
+    
+    .stExpander > div > div {
+        color: #e8e9ea;
+    }
+    
+    .stMetric {
+        background: rgba(45, 55, 72, 0.6);
         padding: 1rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 0.5rem;
+        border-radius: 8px;
+        border: 1px solid #4a5568;
     }
-    .audio-player {
+    
+    .stMetric > div {
+        color: #e8e9ea;
+    }
+    
+    .stSuccess {
+        background: rgba(72, 187, 120, 0.2);
+        border: 1px solid #48bb78;
+        color: #68d391;
+    }
+    
+    .stError {
+        background: rgba(245, 101, 101, 0.2);
+        border: 1px solid #f56565;
+        color: #fc8181;
+    }
+    
+    .stInfo {
+        background: rgba(99, 179, 237, 0.2);
+        border: 1px solid #63b3ed;
+        color: #90cdf4;
+    }
+    
+    .stSpinner > div {
+        border-color: #64b5f6;
+    }
+    
+    /* Chat input styling */
+    .stChatInput > div {
+        background: rgba(45, 55, 72, 0.8) !important;
+        border: 1px solid #4a5568 !important;
+        border-radius: 12px !important;
+    }
+    
+    .stChatInput input {
+        background: transparent !important;
+        color: #e8e9ea !important;
+        border: none !important;
+    }
+    
+    .stChatInput input::placeholder {
+        color: #a0aec0 !important;
+    }
+    
+    /* Download button styling */
+    .stDownloadButton > button {
+        background: rgba(45, 55, 72, 0.8);
+        border: 1px solid #4a5568;
+        color: #e8e9ea;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        transition: all 0.2s ease;
+    }
+    
+    .stDownloadButton > button:hover {
+        background: rgba(100, 181, 246, 0.2);
+        border-color: #64b5f6;
+        transform: translateY(-1px);
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #1a202c;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #4a5568;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #64b5f6;
+    }
+    
+    /* Glassmorphism effect for cards */
+    .glass-card {
+        background: rgba(45, 55, 72, 0.25);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
+    
+    /* Audio player styling */
+    audio {
+        width: 100%;
+        height: 40px;
+        background: rgba(45, 55, 72, 0.8);
+        border-radius: 8px;
         margin: 1rem 0;
     }
 </style>
@@ -87,7 +288,7 @@ class GeminiChat:
         self.api_key = st.secrets.get("GEMINI_API_KEY", "")
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.text_model = genai.GenerativeModel('gemma-3n-e4b-it')
+            self.text_model = genai.GenerativeModel('gemini-2.0-flash-exp')
             try:
                 self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
             except:
