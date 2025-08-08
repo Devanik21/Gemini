@@ -605,12 +605,15 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         else:
-            clean_content = re.sub(r'<[^>]+>', '', message["content"])
-            st.markdown(f"""
-            <div class="chat-message assistant-message">
-                <strong>🧠 Gemini:</strong> {clean_content}
-            </div>
-            """, unsafe_allow_html=True)
+            # The 'st.container()' provides a safe, isolated space to render content.
+            # We then use CSS to style this container, which is a more stable approach.
+            with st.container():
+                st.markdown(f"""
+                <div class="chat-message assistant-message">
+                    <strong>🧠 Gemini:</strong>
+                    {message["content"]}
+                </div>
+                """, unsafe_allow_html=True)
             
             # Audio playback for assistant messages
             if "audio_bytes" in message and message["audio_bytes"]:
