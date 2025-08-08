@@ -9,3 +9,6 @@ pillow
 requests
 fpdf
 openpyxl
+tinydb 
+gtts 
+markdown
