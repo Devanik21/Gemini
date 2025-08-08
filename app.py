@@ -568,10 +568,11 @@ def main():
         if st.button("🆕 New Chat", type="primary"):
             # Save current chat if auto-save is enabled
             if auto_save and st.session_state.messages:
-                st.session_state.gemini_chat.save_chat_to_db(
-                    st.session_state.messages, 
-                    st.session_state.chat_id
-                )
+                chat_data = {
+                    'messages': st.session_state.messages,
+                    'chat_id': st.session_state.chat_id
+                }
+                st.session_state.gemini_chat.save_chat_to_db(chat_data)
             
             st.session_state.messages = []
             st.session_state.chat_id = str(uuid.uuid4())
