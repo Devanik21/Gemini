@@ -292,10 +292,10 @@ class GeminiChat:
             genai.configure(api_key=self.api_key)
             # Use current, publicly available and capable models
             # gemini-1.5-flash is a fast, multimodal model for chat and analysis
-            self.text_model = genai.GenerativeModel('gemini-2.0-flash')
+            self.text_model = genai.GenerativeModel('gemini-2.0-flash-lite')
             try:
                 # Gemini 1.5 Pro is powerful and can generate images
-                self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
+                self.image_model = genai.GenerativeModel('gemini-2.0-flash-lite')
             except Exception as e:
                 st.warning(f"Could not initialize the image generation model: {e}")
                 self.image_model = None
