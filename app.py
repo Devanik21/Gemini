@@ -724,7 +724,7 @@ def main():
 
     # Footer
     st.markdown("---")
-    st.markdown("### 🌟 Features: File Upload • Image Generation • Multi-language Audio • Smart Context • Export Options")
+
     
     # Stats
     if st.session_state.messages:
@@ -740,5 +740,6 @@ def main():
             except:
                 st.metric("Total Conversations", "N/A")
 
+st.markdown("### 🌟 Features: File Upload • Image Generation • Multi-language Audio • Smart Context • Export Options")
 if __name__ == "__main__":
     main()
