@@ -345,14 +345,35 @@ class GeminiChat:
             # This flow is separate from analyzing uploaded files.
             if self.is_image_generation_request(prompt) and self.image_model:
                 try:
-                    image_prompt = re.sub(r'\[.*?\]\s*', '', prompt).strip()
-                    response = self.image_model.generate_content(image_prompt)
+                    # --- START: UPDATED IMAGE GENERATION LOGIC ---
+                    full_prompt = re.sub(r'\[.*?\]\s*', '', prompt).strip()
+
+                    # Handle negative prompts included in the chat input.
+                    # e.g., "A beautiful landscape --no buildings, cars"
+                    prompt_parts = full_prompt.split('--no', 1)
+                    positive_prompt = prompt_parts[0].strip()
                     
+                    # Create the contents list, which is a more robust method.
+                    generation_contents = [positive_prompt]
+                    
+                    if len(prompt_parts) > 1 and prompt_parts[1].strip():
+                        negative_prompt = prompt_parts[1].strip()
+                        # Add the negative prompt in the format the API expects.
+                        generation_contents.append(f"Negative prompt: {negative_prompt}")
+
+                    # Generate content using the list of prompts.
+                    response = self.image_model.generate_content(generation_contents)
+                    
+                    # Check if the response contains an image part, as before.
                     if hasattr(response, 'parts') and any(p.mime_type.startswith("image/") for p in response.parts):
-                        return response, "image" # Return type for image creation
+                        return response, "image"
                     else:
+                        # Fallback if no image is generated, return the text response.
                         return response, "text"
+                    # --- END: UPDATED IMAGE GENERATION LOGIC ---
+
                 except Exception as e:
+                    st.error(f"Image generation failed: {e}")
                     fallback_prompt = f"I tried to generate an image for '{prompt}', but an error occurred. Here is a text description instead: {prompt}"
                     fallback_response = self.text_model.generate_content(fallback_prompt)
                     return fallback_response, "text"
