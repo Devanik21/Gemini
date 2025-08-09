@@ -295,7 +295,7 @@ class GeminiChat:
             self.text_model = genai.GenerativeModel('gemini-2.0-flash')
             try:
                 # Gemini 1.5 Pro is powerful and can generate images
-                self.image_model = genai.GenerativeModel('gemini-2.5-flash')
+                self.image_model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation)
             except Exception as e:
                 st.warning(f"Could not initialize the image generation model: {e}")
                 self.image_model = None
